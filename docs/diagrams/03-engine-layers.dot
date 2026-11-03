@@ -1,0 +1,53 @@
+digraph G {
+  graph [rankdir=TB, nodesep=0.35, ranksep=0.55];
+  graph [splines=spline, fontname="DejaVu Sans", bgcolor="white", pad=0.3, newrank=true];   node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, penwidth=1.6, margin="0.2,0.08"];   edge  [fontname="DejaVu Sans", fontsize=9.5, color="#334155", arrowsize=0.7]; 
+  IN [shape=plaintext, style="", label=<<b>Aeron 1001</b><br/><font point-size="9">commands from Trading Service · Funding · Admin</font>>];
+  subgraph cluster_eng { label=<<b>Matching Engine process (PRIMARY)</b>  — one JVM, pinned threads>; style="rounded,filled"; fillcolor="#fffbf5"; color="#ea580c"; fontcolor="#c2410c"; margin=16;
+
+    subgraph cluster_l1 { label=<<b>L1 · Transport &amp; sequencing</b>>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      POLL [fillcolor="#e5e7eb", color="#475569", label=<<b>Ingress poller</b> [T1]<br/><font point-size="9">Aeron subscription 1001 · SBE decode (flyweight)<br/>stamps engineSeq + engineTime · claims ring slot</font>>];
+    }
+    subgraph cluster_l2 { label=<<b>L2 · Inbound Disruptor  (OrderCommand ring, 2^20 slots, pre-allocated)</b>>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      JRN [fillcolor="#ffedd5", color="#ea580c", label=<<b>Journaller</b> [T2]<br/><font point-size="9">Archive publication 100 (IPC)<br/>batch per endOfBatch</font>>];
+      REP [fillcolor="#ffedd5", color="#ea580c", label=<<b>Replicator</b> [T3]<br/><font point-size="9">publication 101 → standby<br/>tracks ack 102 → replicatedSeq</font>>];
+      R1  [fillcolor="#fde68a", color="#d97706", label=<<b>R1 Risk pre-trade</b> [T4..]<br/><font point-size="9">shard = userId % N<br/>validate · reserve funds (hold)</font>>];
+      ME  [fillcolor="#fed7aa", color="#ea580c", penwidth=2.4, label=<<b>Matcher</b> [T6..]<br/><font point-size="9">shard = instrumentId % M<br/>order books · price-time match · STP</font>>];
+      R2  [fillcolor="#fde68a", color="#d97706", label=<<b>R2 Settlement</b> [T4..]<br/><font point-size="9">shard = userId % N<br/>apply fills · fees · release holds</font>>];
+      MDB [fillcolor="#e0f2fe", color="#0369a1", label=<<b>Market-data builder</b> [T8]<br/><font point-size="9">L2 deltas · trades · periodic snapshot</font>>];
+    }
+    subgraph cluster_l3 { label=<<b>L3 · Output gating &amp; egress</b>>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      GATE [fillcolor="#fecaca", color="#dc2626", label=<<b>Release gate</b><br/><font point-size="9">publish seq ≤ min(journalSeq, replicatedSeq)<br/>(sync mode) — no output before it is durable</font>>];
+      EXO  [fillcolor="#e5e7eb", color="#475569", label=<<b>Exec-event publisher</b> [T9]<br/><font point-size="9">SBE encode · tryClaim · publication 2001</font>>];
+      MDO  [fillcolor="#e5e7eb", color="#475569", label=<<b>Market-data publisher</b> [T9]<br/><font point-size="9">publication 3001 · conflation-free</font>>];
+    }
+    subgraph cluster_state { label=<<b>L4 · In-memory state</b> (single writer per shard, off-heap/pooled)>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      ACC [shape=box3d, style=filled, fillcolor="#fef9c3", color="#ca8a04", label=<<b>Accounts</b><br/><font point-size="9">userId → balances[ccy]{available, held}<br/>fee tiers · status</font>>];
+      BK  [shape=box3d, style=filled, fillcolor="#ffedd5", color="#ea580c", label=<<b>Order books</b><br/><font point-size="9">per instrument: bid/ask levels · FIFO<br/>orderId index · object pools</font>>];
+      REF [shape=box3d, style=filled, fillcolor="#f1f5f9", color="#475569", label=<<b>Reference data</b><br/><font point-size="9">instruments · tick/lot · bands · status</font>>];
+    }
+    subgraph cluster_l5 { label=<<b>L5 · Control plane</b> (off hot path)>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      SNAP [fillcolor="#f1f5f9", color="#475569", label=<<b>Snapshot manager</b><br/><font point-size="9">barrier at seq S → serialise state<br/>→ Archive (every 5 min / 1M cmds)</font>>];
+      ROLE [fillcolor="#f1f5f9", color="#475569", label=<<b>Role / HA controller</b><br/><font point-size="9">PRIMARY | STANDBY · epoch · heartbeats</font>>];
+      MET  [fillcolor="#f1f5f9", color="#475569", label=<<b>Metrics</b><br/><font point-size="9">HdrHistogram per stage · Agrona counters</font>>];
+    }
+  }
+  ARC [shape=cylinder, fillcolor="#ffedd5", color="#ea580c", label=<<b>Aeron Archive</b>>];
+  SBY [fillcolor="#ffedd5", color="#ea580c", label=<<b>Standby engine</b>>];
+  O1 [shape=plaintext, style="", label=<<b>Aeron 2001</b><br/><font point-size="9">acks · rejects · exec reports · balances</font>>];
+  O2 [shape=plaintext, style="", label=<<b>Aeron 3001</b><br/><font point-size="9">L2 book deltas · public trades · snapshots</font>>];
+
+  IN -> POLL [color="#d97706", penwidth=2];
+  POLL -> JRN; POLL -> REP; POLL -> R1 [penwidth=1.8];
+  R1 -> ME [penwidth=1.8]; ME -> R2 [penwidth=1.8]; ME -> MDB;
+  JRN -> GATE [style=dashed]; REP -> GATE [style=dashed]; R2 -> GATE [penwidth=1.8]; MDB -> GATE;
+  GATE -> EXO; GATE -> MDO;
+  EXO -> O1 [color="#d97706", penwidth=2]; MDO -> O2 [color="#d97706", penwidth=2];
+  JRN -> ARC [color="#d97706", label=" 100"]; REP -> SBY [color="#d97706", dir=both, label=" 101 / 102"];
+  R1 -> ACC [style=dotted, arrowhead=none]; R2 -> ACC [style=dotted, arrowhead=none]; ME -> BK [style=dotted, arrowhead=none]; R1 -> REF [style=dotted, arrowhead=none];
+  SNAP -> ARC [style=dashed, color="#64748b", constraint=false];
+  {rank=same; JRN; REP; R1}
+  {rank=same; ACC; BK; REF}
+  {rank=same; SNAP; ROLE; MET}
+  O1 -> SNAP [style=invis]; O2 -> ROLE [style=invis];
+  ACC -> SNAP [style=invis];
+}

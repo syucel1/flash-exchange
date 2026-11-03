@@ -1,0 +1,45 @@
+digraph G {
+  graph [rankdir=TB, nodesep=0.5, ranksep=1.0];
+  graph [splines=spline, fontname="DejaVu Sans", bgcolor="white", pad=0.3, newrank=true];   node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, penwidth=1.6, margin="0.2,0.08"];   edge  [fontname="DejaVu Sans", fontsize=9.5, color="#334155", arrowsize=0.7]; 
+  subgraph cluster_gw { label=<<b>Gateway host</b> (×N, one Trading Service each)>; style=rounded; color="#94a3b8"; fontcolor="#334155"; margin=14;
+    TS  [fillcolor="#fef3c7", color="#d97706", label=<<b>Trading Service</b><br/><font point-size="9">Netty · Disruptor · Aeron client</font>>];
+    MDG [fillcolor="#e5e7eb", color="#475569", label=<<b>Aeron Media Driver</b><br/><font point-size="9">shared, /dev/shm</font>>];
+    TS -> MDG [dir=both, style=dashed, label=" IPC"];
+  }
+  subgraph cluster_svc { label=<<b>Services host(s)</b> (containers / VMs)>; style=rounded; color="#94a3b8"; fontcolor="#334155"; margin=14;
+    HIST [fillcolor="#eef2ff", color="#6366f1", label=<<b>History Service</b>>];
+    FUND [fillcolor="#eef2ff", color="#6366f1", label=<<b>Funding Service</b>>];
+    IDS  [fillcolor="#eef2ff", color="#6366f1", label=<<b>Identity Service</b><br/><font point-size="9">(no Aeron)</font>>];
+    MDS  [fillcolor="#e5e7eb", color="#475569", label=<<b>Aeron Media Driver</b>>];
+    HIST -> MDS [dir=both, style=dashed, label=" IPC"]; FUND -> MDS [dir=both, style=dashed, label=" IPC"];
+  }
+  subgraph cluster_data { label=<<b>Data host(s)</b>>; style=rounded; color="#94a3b8"; fontcolor="#334155"; margin=14;
+    PG [shape=cylinder, fillcolor="#e0f2fe", color="#0369a1", label=<<b>PostgreSQL</b><br/><font point-size="9">primary + streaming replica</font>>];
+    RD [shape=cylinder, fillcolor="#fee2e2", color="#dc2626", label=<<b>Redis</b><br/><font point-size="9">primary + replica (Sentinel)</font>>];
+  }
+  subgraph cluster_a { label=<<b>Core host A — engine PRIMARY</b>>; style="rounded,filled"; fillcolor="#fff7ed"; color="#ea580c"; fontcolor="#c2410c"; margin=14;
+    MDA [fillcolor="#e5e7eb", color="#475569", label=<<b>Aeron Media Driver</b><br/><font point-size="9">dedicated threads · /dev/shm · pinned cores</font>>];
+    MEA [fillcolor="#fed7aa", color="#ea580c", penwidth=2.4, label=<<b>Matching Engine</b>>];
+    ARA [shape=cylinder, fillcolor="#ffedd5", color="#ea580c", label=<<b>Aeron Archive</b><br/><font point-size="9">NVMe</font>>];
+    MDA -> MEA [dir=both, style=dashed, label=" IPC (shared memory)"]; MDA -> ARA [dir=both, style=dashed, label=" IPC"];
+  }
+  subgraph cluster_b { label=<<b>Core host B — engine STANDBY</b>>; style="rounded,filled"; fillcolor="#fff7ed"; color="#ea580c"; fontcolor="#c2410c"; margin=14;
+    MDB [fillcolor="#e5e7eb", color="#475569", label=<<b>Aeron Media Driver</b>>];
+    MEB [fillcolor="#ffedd5", color="#ea580c", label=<<b>Matching Engine (standby)</b>>];
+    ARB [shape=cylinder, fillcolor="#ffedd5", color="#ea580c", label=<<b>Aeron Archive</b>>];
+    MDB -> MEB [dir=both, style=dashed, label=" IPC"]; MDB -> ARB [dir=both, style=dashed, label=" IPC"];
+  }
+  WIT [fillcolor="#f1f5f9", color="#475569", label=<<b>Arbiter / witness</b><br/><font point-size="9">failover decision · epoch fencing</font>>];
+
+  {rank=same; TS; HIST; FUND; IDS}
+  {rank=same; MDG; MDS; PG; RD}
+  {rank=same; MDA; MDB; WIT}
+
+  MDG -> MDA [color="#d97706", penwidth=2, label="UDP unicast\ncommands (1001)"];
+  MDA -> MDG [color="#d97706", penwidth=2, label="UDP MDC: exec events (2001)\nmulticast/MDC: market data (3001)"];
+  MDS -> MDA [color="#d97706", penwidth=1.6, label="UDP unicast\ndeposits (1001)"];
+  MDA -> MDS [color="#d97706", penwidth=1.6, label="UDP MDC\n2001 + 3001\nreplay (4001)"];
+  MDA -> MDB [color="#ea580c", penwidth=2.4, dir=both, label="UDP unicast\nreplication (101) →\n← ack (102)"];
+  WIT -> MDA [style=dotted, color="#64748b", arrowhead=none, label="heartbeats"]; WIT -> MDB [style=dotted, color="#64748b", arrowhead=none];
+  TS -> RD [color="#dc2626", constraint=false]; IDS -> RD [color="#dc2626"]; IDS -> PG [color="#0369a1"]; HIST -> PG [color="#0369a1"]; FUND -> PG [color="#0369a1"];
+}

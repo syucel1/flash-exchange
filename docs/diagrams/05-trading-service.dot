@@ -1,0 +1,36 @@
+digraph G {
+  graph [rankdir=TB, nodesep=0.5, ranksep=0.45];
+  graph [splines=spline, fontname="DejaVu Sans", bgcolor="white", pad=0.3, newrank=true];   node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, penwidth=1.6, margin="0.2,0.08"];   edge  [fontname="DejaVu Sans", fontsize=9.5, color="#334155", arrowsize=0.7]; 
+  GW [fillcolor="#f1f5f9", color="#475569", label=<<b>Edge / API Gateway</b> (wss, REST)>];
+  subgraph cluster_ts { label=<<b>Trading Service instance</b>>; style="rounded,filled"; fillcolor="#fffdf5"; color="#d97706"; fontcolor="#b45309"; margin=16;
+    subgraph cluster_a { label=<<b>A · Client connectivity</b> (Netty event loops)>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      NET  [fillcolor="#e5e7eb", color="#475569", label=<<b>WS / REST endpoints</b><br/><font point-size="9">JSON codec · heartbeats · back-pressure</font>>];
+      AUTH [fillcolor="#e5e7eb", color="#475569", label=<<b>Session manager</b><br/><font point-size="9">JWT verify (JWKS cache) · userId → sessions</font>>];
+      OUTQ [fillcolor="#e5e7eb", color="#475569", label=<<b>Per-session write queues</b><br/><font point-size="9">private: lossless · market data: conflated</font>>];
+    }
+    subgraph cluster_b { label=<<b>B · Inbound Disruptor</b> (ClientRequest ring)>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      VAL  [fillcolor="#fde68a", color="#d97706", label=<<b>Validator</b><br/><font point-size="9">instrument · tick/lot · min notional<br/>TIF rules · price band (soft)</font>>];
+      LIM  [fillcolor="#fde68a", color="#d97706", label=<<b>Limits &amp; idempotency</b><br/><font point-size="9">local token buckets · clOrdId window<br/>soft funds check (balance cache)</font>>];
+      ENC  [fillcolor="#fed7aa", color="#ea580c", label=<<b>Command encoder</b><br/><font point-size="9">SBE → publication 1001</font>>];
+    }
+    subgraph cluster_c { label=<<b>C · Outbound Disruptor</b> (EngineEvent ring)>; style="rounded,filled"; fillcolor="#f8fafc"; color="#94a3b8"; fontcolor="#334155";
+      POLL [fillcolor="#fed7aa", color="#ea580c", label=<<b>Aeron poller</b><br/><font point-size="9">subs 2001 + 3001 · gap detection</font>>];
+      ROUTE[fillcolor="#fde68a", color="#d97706", label=<<b>User event router</b><br/><font point-size="9">acks · fills · balances → user sessions<br/>open-order &amp; balance caches</font>>];
+      BOOKS[fillcolor="#e0f2fe", color="#0369a1", label=<<b>Book replicas</b><br/><font point-size="9">L2 per instrument · L3 own-order queue position</font>>];
+      CONF [fillcolor="#e0f2fe", color="#0369a1", label=<<b>Conflator</b><br/><font point-size="9">≤ 20 Hz per subscription · ticker roll-up</font>>];
+    }
+  }
+  RD [shape=cylinder, fillcolor="#fee2e2", color="#dc2626", label=<<b>Redis</b><br/><font point-size="9">sessions · denylist · global rate limits<br/>clOrdId keys · user→gateway map</font>>];
+  PG [shape=cylinder, fillcolor="#e0f2fe", color="#0369a1", label=<<b>PostgreSQL</b><br/><font point-size="9">start-up reference data</font>>];
+  ME [fillcolor="#fed7aa", color="#ea580c", penwidth=2.2, label=<<b>Matching Engine</b>>];
+
+  GW -> NET [dir=both, penwidth=1.8];
+  NET -> AUTH [penwidth=1.8]; AUTH -> VAL [penwidth=1.8]; VAL -> LIM [penwidth=1.8]; LIM -> ENC [penwidth=1.8];
+  ENC -> ME [color="#d97706", penwidth=2.2, label=" 1001"];
+  POLL -> ME [dir=back, color="#d97706", penwidth=2.2, label=" 2001 / 3001"];
+  ROUTE -> POLL [dir=back]; BOOKS -> POLL [dir=back]; CONF -> BOOKS [dir=back];
+  OUTQ -> ROUTE [dir=back, penwidth=1.6]; OUTQ -> CONF [dir=back];
+  NET -> OUTQ [dir=back, label=" push", penwidth=1.6];
+  AUTH -> RD [color="#dc2626", style=dashed, label=" async"]; LIM -> RD [color="#dc2626", style=dashed, label=" async sync of\n counters"]; 
+  ROUTE -> PG [color="#0369a1", style=dotted, label=" boot"];
+}

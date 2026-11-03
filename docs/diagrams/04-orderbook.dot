@@ -1,0 +1,43 @@
+digraph G {
+  graph [rankdir=TB, nodesep=0.3, ranksep=0.45];
+  graph [splines=spline, fontname="DejaVu Sans", bgcolor="white", pad=0.3, newrank=true];   node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, penwidth=1.6, margin="0.2,0.08"];   edge  [fontname="DejaVu Sans", fontsize=9.5, color="#334155", arrowsize=0.7]; 
+  node [shape=plaintext, style=""];
+  BOOK [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" bgcolor="#fff7ed" color="#ea580c" style="rounded">
+    <tr><td bgcolor="#fed7aa"><b>OrderBook</b> EURUSD (id 1)</td></tr>
+    <tr><td align="left" port="bids">bids: PriceLevelTree ↓ (desc)</td></tr>
+    <tr><td align="left" port="asks">asks: PriceLevelTree ↑ (asc)</td></tr>
+    <tr><td align="left" port="idx">ordersById: Long2ObjectHashMap</td></tr>
+    <tr><td align="left">bestBid / bestAsk (cached ptr)</td></tr>
+    <tr><td align="left">bookSeq · lastTradePx · refPx</td></tr></table>>];
+  POOL [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#f1f5f9" color="#475569" style="rounded">
+    <tr><td bgcolor="#e2e8f0"><b>Object pools</b> (pre-allocated)</td></tr>
+    <tr><td align="left">Order[10M] · PriceLevel[1M]</td></tr><tr><td align="left">free-list, no GC on hot path</td></tr></table>>];
+
+  subgraph asks { label=<<b>ASK side</b> (best first)>; style=rounded; color="#dc2626"; fontcolor="#b91c1c";
+    A1 [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#fee2e2" color="#dc2626" style="rounded"><tr><td><b>1.08350</b></td></tr><tr><td><font point-size="9">totalQty 120,000 · count 2</font></td></tr></table>>];
+    A2 [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#fee2e2" color="#dc2626" style="rounded"><tr><td><b>1.08355</b></td></tr><tr><td><font point-size="9">totalQty 200,000 · count 1</font></td></tr></table>>];
+  }
+  subgraph bids { label=<<b>BID side</b> (best first)>; style=rounded; color="#16a34a"; fontcolor="#15803d";
+    B1 [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#dcfce7" color="#16a34a" style="rounded"><tr><td><b>1.08345</b></td></tr><tr><td><font point-size="9">totalQty 250,000 · count 3</font></td></tr></table>>];
+    B2 [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#dcfce7" color="#16a34a" style="rounded"><tr><td><b>1.08340</b></td></tr><tr><td><font point-size="9">totalQty 150,000 · count 1</font></td></tr></table>>];
+  }
+  node [shape=box, style="rounded,filled", fontsize=9];
+  O1 [fillcolor="#ffffff", color="#16a34a", label="#7001 u42\n100,000 · t=09:00:01"];
+  O2 [fillcolor="#fef3c7", color="#d97706", penwidth=2.2, label="#7005 u17 (you)\n50,000 · t=09:00:03"];
+  O3 [fillcolor="#ffffff", color="#16a34a", label="#7009 u88\n100,000 · t=09:00:07"];
+  O4 [fillcolor="#ffffff", color="#16a34a", label="#7002 u55\n150,000 · oldest"];
+  O5 [fillcolor="#ffffff", color="#dc2626", label="#7003 u61\n70,000 · oldest"];
+  O6 [fillcolor="#ffffff", color="#dc2626", label="#7006 u42\n50,000"];
+
+  BOOK:bids -> B1 [label=" best bid", color="#16a34a"]; BOOK:asks -> A1 [label=" best ask", color="#dc2626"];
+  {rank=same; B2; B1; A1; A2}
+  B2 -> B1 [dir=back, label="next worse"]; B1 -> A1 [label="spread", style=dashed, arrowhead=none, color="#94a3b8"]; A1 -> A2 [label="next worse"];
+  B1 -> O1 [label=" head (oldest)", color="#16a34a"]; O1 -> O2 [dir=both, color="#16a34a"]; O2 -> O3 [dir=both, color="#16a34a", label=" tail"];
+  B2 -> O4 [label=" head", color="#16a34a"];
+  A1 -> O5 [label=" head", color="#dc2626"]; O5 -> O6 [dir=both, color="#dc2626", label=" tail"];
+  A2 -> O7 [label=" head", color="#dc2626"];
+  O7 [fillcolor="#ffffff", color="#dc2626", label="#7004 u30\n200,000"];
+  BOOK:idx -> O2 [style=dotted, color="#64748b", label=" O(1) cancel\n lookup"];
+  BOOK -> POOL [style=invis];
+  {rank=same; BOOK; POOL}
+}

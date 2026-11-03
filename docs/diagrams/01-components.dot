@@ -1,0 +1,51 @@
+digraph G {
+  graph [rankdir=TB, splines=spline, nodesep=0.55, ranksep=0.95, fontname="DejaVu Sans", bgcolor="white", pad=0.3, newrank=true];
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, penwidth=1.6, margin="0.2,0.08"];
+  edge  [fontname="DejaVu Sans", fontsize=9.5, color="#334155", arrowsize=0.7];
+
+  WEB [fillcolor="#ecfeff", color="#0891b2", label=<<b>Web Trading Platform</b> (browser)<br/>React + TypeScript SPA<br/><font point-size="9">trade screen · order book · blotters · portfolio · funding · settings</font>>];
+  legend [shape=plaintext, style="", label=<<font color="#64748b" point-size="9.5">orange = Aeron (reliable UDP across hosts, IPC on the same host)<br/>blue = SQL · red = Redis · grey = HTTPS · (nnnn) = Aeron stream id</font>>];
+
+  GW  [fillcolor="#f1f5f9", color="#475569", label=<<b>Edge / API Gateway</b><br/><font point-size="9">TLS 1.3 · routing · static SPA · WAF · IP rate limits · sticky WS</font>>];
+  PSP [fillcolor="#f1f5f9", color="#475569", label=<<b>Payment provider / bank</b><br/><font point-size="9">simulated in phase 1</font>>];
+
+  subgraph cluster_web { label=<<b>Web services tier</b> (horizontally scalable)>; fontsize=12; style="rounded"; color="#94a3b8"; fontcolor="#475569"; margin=14;
+    IDS  [fillcolor="#eef2ff", color="#6366f1", label=<<b>Identity Service</b><br/><font point-size="9">register · login · 2FA<br/>JWT/JWKS · user settings</font>>];
+    HIST [fillcolor="#eef2ff", color="#6366f1", label=<<b>History Service</b><br/><font point-size="9">event recorder · history<br/>portfolio · candles · 24h stats</font>>];
+    FUND [fillcolor="#eef2ff", color="#6366f1", label=<<b>Funding Service</b><br/><font point-size="9">fiat deposits · ledger<br/>linked bank accounts</font>>];
+    TS   [fillcolor="#fef3c7", color="#d97706", penwidth=2.4, label=<<b>Trading Service</b><br/><font point-size="9">REST + WebSocket · validation<br/>book replicas · event routing</font>>];
+  }
+  subgraph cluster_data { label=<<b>Data tier</b>>; fontsize=12; style="rounded"; color="#94a3b8"; fontcolor="#475569"; margin=14;
+    PG    [shape=cylinder, fillcolor="#e0f2fe", color="#0369a1", label=<<b>PostgreSQL</b><br/><font point-size="9">users · settings · deposits<br/>orders · trades · ledger</font>>];
+    REDIS [shape=cylinder, fillcolor="#fee2e2", color="#dc2626", label=<<b>Redis</b><br/><font point-size="9">sessions · token denylist<br/>rate limits · user→gateway map<br/>clOrdId idempotency</font>>];
+  }
+  subgraph cluster_core { label=<<b>Core tier — latency critical (dedicated hosts)</b>>; fontsize=12; style="rounded,filled"; fillcolor="#fff7ed"; color="#ea580c"; fontcolor="#c2410c"; margin=14;
+    ARC [shape=cylinder, fillcolor="#ffedd5", color="#ea580c", label=<<b>Aeron Archive</b><br/><font point-size="9">journal · recordings · snapshots</font>>];
+    MEP [fillcolor="#fed7aa", color="#ea580c", penwidth=2.6, label=<<b>Matching Engine — PRIMARY</b><br/><font point-size="9">sequencer · risk → matching → settlement<br/>single writer · Disruptor pipelines</font>>];
+    MES [fillcolor="#ffedd5", color="#ea580c", label=<<b>Matching Engine — STANDBY</b><br/><font point-size="9">applies the same journal<br/>identical hot state</font>>];
+  }
+
+  {rank=same; WEB; legend}
+  {rank=same; GW; PSP}
+  {rank=same; IDS; HIST; FUND; TS}
+  {rank=same; PG; REDIS; ARC; MEP; MES}
+  WEB -> legend [style=invis]; GW -> PSP [style=invis];
+  IDS -> HIST -> FUND -> TS [style=invis];
+  REDIS -> PG -> ARC [style=invis];
+
+  WEB -> GW [dir=both, penwidth=1.4, label="  HTTPS REST + WebSocket (wss)"];
+  GW -> IDS; GW -> HIST; GW -> FUND;
+  GW -> TS [penwidth=2, label="  wss / REST"];
+  PSP -> FUND [dir=both, color="#64748b", label="HTTPS + webhooks"];
+
+  TS  -> MEP [color="#d97706", penwidth=2.2, label="commands (1001)"];
+  MEP -> TS  [color="#d97706", penwidth=2.2, label="exec reports,\nbalances (2001)\nmarket data (3001)"];
+  FUND -> MEP [color="#d97706", penwidth=1.6, label="deposits (1001)\nDepositCredited (2001)", dir=both];
+  MEP -> HIST [color="#d97706", penwidth=1.6, label="all events\n(2001, 3001)", constraint=false];
+  ARC -> MEP [dir=back, color="#d97706", penwidth=1.6, label="IPC journal (100)"];
+  MEP -> MES [color="#d97706", penwidth=2.2, label="UDP replication (101) →\n← ack (102)", dir=both, minlen=2];
+
+  IDS -> PG [color="#0369a1"]; HIST -> PG [color="#0369a1"]; FUND -> PG [color="#0369a1"];
+  TS -> PG [color="#0369a1", style=dotted, label="start-up ref data", constraint=false];
+  IDS -> REDIS [color="#dc2626"]; TS -> REDIS [color="#dc2626", label="sessions, limits"];
+}
