@@ -17,6 +17,8 @@ Flash Exchange is a spot currency exchange. Registered users fund their accounts
 | 7 | [Interactions](docs/07-interactions.md) | Sequence diagrams for every key flow, order state machine |
 | 8 | [NFRs, Operations & Roadmap](docs/08-nfr-ops-roadmap.md) | Latency/throughput targets, HA, security, observability, testing, delivery plan |
 
+**Roadmap:** [ROADMAP.md](ROADMAP.md) / [ROADMAP.html](ROADMAP.html), with UI mockups in [`mockups/`](mockups/).
+
 The whole design in one file: [design.pdf](design.pdf) or [design.html](design.html) (open in a browser; light/dark toggle).
 
 Architecture diagrams are Graphviz (sources in `docs/diagrams/*.dot`, rendered to PNG and SVG). Flow and sequence diagrams are Mermaid and render in GitHub, GitLab, VS Code and IntelliJ.

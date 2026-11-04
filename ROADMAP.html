@@ -1,0 +1,552 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlashEx Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7fb;--panel:#fff;--text:#0f172a;--muted:#64748b;--line:#e5e8ef;--accent:#5b5bf6;--accent2:#06b6d4;--code:#f1f4f9;--th:#f8fafc;
+--platform:#6366f1;--product:#0ea5a4;--launch:#f59e0b;--track:#eef1f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a0e17;--panel:#111723;--text:#e6ebf3;--muted:#94a3b8;--line:#1e2635;--accent:#818cf8;--accent2:#22d3ee;--code:#0d131e;--th:#151c29;--track:#182030}}
+:root[data-theme="dark"]{--bg:#0a0e17;--panel:#111723;--text:#e6ebf3;--muted:#94a3b8;--line:#1e2635;--accent:#818cf8;--accent2:#22d3ee;--code:#0d131e;--th:#151c29;--track:#182030}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 Inter,system-ui,sans-serif}
+.side{position:fixed;inset:0 auto 0 0;width:260px;padding:24px 16px;background:var(--panel);border-right:1px solid var(--line);overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;margin-bottom:4px}.brand b{background:linear-gradient(90deg,#6366f1,#06b6d4);-webkit-background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:12px;margin:0 0 18px 42px}
+.side a{display:block;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:500}.side a:hover,.side a.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.tbtn{margin-top:16px;width:100%;padding:8px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font:inherit;font-size:13px}
+main{margin-left:260px;padding:32px 44px 80px;max-width:1240px}
+.hero{border-radius:20px;padding:36px 40px;color:#fff;background:radial-gradient(900px 260px at 0 0,#22d3ee55,transparent),linear-gradient(135deg,#312e81,#4f46e5 55%,#0891b2);margin-bottom:26px}
+.hero h1{margin:0 0 6px;font-size:36px;letter-spacing:-.03em}.hero p{margin:0;opacity:.92;max-width:820px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}.kpis div{background:#ffffff1f;border:1px solid #ffffff33;border-radius:12px;padding:12px 14px}.kpis b{display:block;font-size:22px}.kpis span{font-size:12px;opacity:.85}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 32px;margin-bottom:22px}
+.card h2{margin:0 0 14px;font-size:22px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.phase h2::before{content:"";width:6px;height:22px;border-radius:3px;background:linear-gradient(var(--accent),var(--accent2))}
+h3{font-size:16px}a{color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:12px 0;display:block;overflow-x:auto}th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}th{background:var(--th);font-weight:600}
+code{font-family:"JetBrains Mono",monospace;font-size:12.5px;background:var(--code);padding:1px 5px;border-radius:4px}
+ul{padding-left:20px}li{margin:3px 0}hr{display:none}
+.ok,.todo{font-size:13px}
+.timeline{margin:18px 0 6px;font-size:12.5px}.tl-row,.tl-head{display:grid;grid-template-columns:230px 1fr;align-items:center;gap:12px;height:30px}
+.tl-label{color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tl-label .num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--track);font-size:11px;font-weight:700;margin-right:8px;color:var(--muted)}
+.tl-track{position:relative;height:100%;background:repeating-linear-gradient(90deg,transparent 0 calc(8.17% - 1px),var(--line) calc(8.17% - 1px) 8.17%)}
+.tl-bar{position:absolute;top:5px;bottom:5px;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;color:#fff;font-size:10.5px;font-weight:700}
+.s-platform{background:var(--platform)}.s-product{background:var(--product)}.s-launch{background:var(--launch)}
+.ticks{background:none}.ticks span{position:absolute;top:6px;color:var(--muted);font-size:11px;transform:translateX(-2px)}
+.tl-legend{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--muted)}.tl-legend span{width:12px;height:12px;border-radius:3px;display:inline-block;margin-left:10px}.tl-legend em{margin-left:auto;font-style:normal}
+.gallery{display:grid;gap:22px}figure{margin:0}figcaption{font-weight:600;margin-bottom:8px}
+.pair-imgs{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pair-imgs a{position:relative;display:block;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pair-imgs img{width:100%;display:block}.pair-imgs span{position:absolute;top:8px;right:8px;background:#000a;color:#fff;font-size:11px;padding:2px 8px;border-radius:99px}
+@media (max-width:900px){.side{position:static;width:auto;border-right:0;border-bottom:1px solid var(--line)}main{margin:0;padding:16px}.card{padding:18px 16px}.kpis{grid-template-columns:1fr 1fr}.pair-imgs{grid-template-columns:1fr}.tl-row,.tl-head{grid-template-columns:120px 1fr}}
+@media print{.side,.tbtn{display:none}main{margin:0;max-width:none}.card{break-inside:avoid-page}.hero{print-color-adjust:exact;-webkit-print-color-adjust:exact}.tl-bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body>
+<nav class="side"><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M18 5 9 18h6l-2 9 10-14h-6l1-8z" fill="#fff"/></svg><span>Flash<b>Ex</b></span></div>
+<div class="sub">Roadmap · v1.0 · Nov 2026</div><a href="#where-we-are">Where we are</a><a href="#phase-overview">Phase overview</a><a href="#phase-1-delivery-foundations-cicd-and-containerisation">1 · Delivery foundations</a><a href="#phase-2-engine-durability-and-high-availability">2 · Engine durability and high availability</a><a href="#phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">3 · Observability I: comprehensive metrics</a><a href="#phase-4-observability-ii-logging-review-and-log-search-for-the-support-desk-elk-kibana">4 · Observability II: logging review and log search for the support desk</a><a href="#phase-5-engine-admin-and-direct-access">5 · Engine admin and direct access</a><a href="#phase-6-accounts-and-risk-in-the-engine">6 · Accounts and risk in the engine</a><a href="#phase-7-trading-service-and-backend-services-fully-containerised-and-tested">7 · Trading Service and backend services</a><a href="#phase-8-web-trading-platform">8 · Web trading platform</a><a href="#phase-9-advanced-order-types">9 · Advanced order types</a><a href="#phase-10-algorithmic-orders">10 · Algorithmic orders</a><a href="#phase-11-security-compliance-and-market-integrity">11 · Security, compliance and market integrity</a><a href="#phase-12-performance-resilience-and-go-live">12 · Performance, resilience and go-live</a><a href="#phase-13-ecosystem-and-growth-post-launch">13 · Ecosystem and growth</a><a href="#cross-cutting-work-runs-through-every-phase">Cross-cutting work</a><a href="#mockups">Mockups</a><button class="tbtn" onclick="toggleTheme()">Toggle light / dark</button></nav>
+<main><div class="hero"><h1>FlashEx Roadmap</h1><p>From a working matching engine to a fully scoped spot FX exchange: 13 phases in dependency order, each ending in something working and testable.</p>
+<div class="kpis"><div><b>13</b><span>phases</span></div><div><b>1 / 13</b><span>engine core delivered</span></div><div><b>~11 months</b><span>to public launch (indicative)</span></div><div><b>126</b><span>tests · 99.9 % coverage today</span></div></div></div>
+
+<p>Status: <strong>v1.0 draft</strong> · Updated: 2026-11-04 · Scope: full spot FX exchange as specified in <a href="README.md"><code>docs/</code></a></p>
+<p>The design describes a complete exchange: matching engine, trading service, web platform, identity, funding,
+history, observability and high availability. So far only the <strong>matching engine and its Aeron integration</strong> exist.
+This roadmap orders the remaining work so that each phase builds on the one before it and ends with something
+working and testable.</p>
+<section class="card"><h2 id="where-we-are">Where we are</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Detailed design (architecture, protocol, services, UI, NFRs)</td>
+<td><span class="ok">✅</span> Done (<code>docs/</code>, <code>design.pdf</code>)</td>
+</tr>
+<tr>
+<td>Matching engine: price-time matching, LIMIT/MARKET, GTC/IOC/FOK, post-only, STP, collar</td>
+<td><span class="ok">✅</span> Done (<code>matching-engine/</code>)</td>
+</tr>
+<tr>
+<td>Disruptor pipeline, Aeron IPC / reliable UDP, L2 market data, snapshots</td>
+<td><span class="ok">✅</span> Done</td>
+</tr>
+<tr>
+<td>Protocol module (binary flyweights), engine client</td>
+<td><span class="ok">✅</span> Done</td>
+</tr>
+<tr>
+<td>Tests: 126 unit + integration, 99.9 % line coverage</td>
+<td><span class="ok">✅</span> Done</td>
+</tr>
+<tr>
+<td>Everything else in this document</td>
+<td><span class="todo">⏳</span> Planned</td>
+</tr>
+</tbody>
+</table>
+</section><section class="card phase"><h2 id="phase-overview">Phase overview</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Phase</th>
+<th>Why it comes here</th>
+<th>Size*</th>
+<th>Depends on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Delivery foundations: CI/CD and containerisation</strong></td>
+<td>Every later phase ships as containers through a pipeline</td>
+<td>M</td>
+<td>–</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Engine durability and HA</strong>: journal, snapshots, standby</td>
+<td>Nothing real can run on an engine that forgets its state on restart</td>
+<td>L</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Observability I: metrics</strong> (Prometheus, Grafana)</td>
+<td>We need to see latency and throughput before adding load and services</td>
+<td>M</td>
+<td>1, 2</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Observability II: logging and support</strong> (ELK, Kibana)</td>
+<td>The support desk must be able to answer "what happened to my order?" from day one of trading</td>
+<td>M</td>
+<td>1, 3</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Engine admin and direct access</strong>: book inspection, admin ops</td>
+<td>Operators need to look inside and act on the engine without the trading service</td>
+<td>M</td>
+<td>2, 3, 4</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Accounts and risk in the engine</strong>: balances, holds, settlement</td>
+<td>The trading service and UI need funds checks and positions</td>
+<td>L</td>
+<td>2</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Trading Service and backend services</strong> (Docker, tests)</td>
+<td>The bridge between users and the engine</td>
+<td>XL</td>
+<td>1–6</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Web trading platform</strong></td>
+<td>The user-facing product</td>
+<td>XL</td>
+<td>7</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Advanced order types</strong>: stop, stop-limit, OCO, GTD, amend, trailing</td>
+<td>Richer trading once the core flow works end to end</td>
+<td>L</td>
+<td>6, 7 (8 for UI)</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Algorithmic orders</strong>: iceberg, peg, TWAP, VWAP, POV and more</td>
+<td>Builds on advanced order infrastructure</td>
+<td>L</td>
+<td>9</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>Security, compliance and surveillance</strong></td>
+<td>Required before real money</td>
+<td>L</td>
+<td>7, 8 (can start in parallel with 9)</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>Performance, resilience and go-live readiness</strong></td>
+<td>Prove the NFRs, then launch</td>
+<td>L</td>
+<td>all of the above</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>Ecosystem</strong>: public API, FIX, mobile, market makers</td>
+<td>Growth after launch</td>
+<td>L</td>
+<td>12</td>
+</tr>
+</tbody>
+</table>
+<p>*Size (one small team): <strong>M</strong> ≈ 2–4 weeks, <strong>L</strong> ≈ 4–8 weeks, <strong>XL</strong> ≈ 8–12 weeks. Phases 3/4, 9/11 and parts of
+7/8 can run in parallel with a second stream of work.</p>
+<div class="timeline"><div class="tl-head"><div class="tl-label"></div><div class="tl-track ticks"><span style="left:0.00%">Nov 26</span><span style="left:8.17%">Dec</span><span style="left:16.34%">Jan 27</span><span style="left:24.51%">Feb</span><span style="left:32.68%">Mar</span><span style="left:40.85%">Apr</span><span style="left:49.02%">May</span><span style="left:57.19%">Jun</span><span style="left:65.36%">Jul</span><span style="left:73.53%">Aug</span><span style="left:81.70%">Sep</span><span style="left:89.87%">Oct</span><span style="left:98.04%">Nov</span></div></div><div class="tl-row"><div class="tl-label"><span class="num">1</span>CI/CD &amp; containers</div><div class="tl-track"><div class="tl-bar s-platform" style="left:0.00%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">2</span>Engine durability &amp; HA</div><div class="tl-track"><div class="tl-bar s-platform" style="left:5.66%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">3</span>Metrics</div><div class="tl-track"><div class="tl-bar s-platform" style="left:5.66%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">4</span>Logging &amp; support</div><div class="tl-track"><div class="tl-bar s-platform" style="left:11.32%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">5</span>Engine admin</div><div class="tl-track"><div class="tl-bar s-platform" style="left:16.98%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">6</span>Accounts &amp; risk</div><div class="tl-track"><div class="tl-bar s-product" style="left:16.98%;width:9.43%"><span>5w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">7</span>Trading service &amp; backend</div><div class="tl-track"><div class="tl-bar s-product" style="left:26.42%;width:18.87%"><span>10w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">8</span>Web platform</div><div class="tl-track"><div class="tl-bar s-product" style="left:45.28%;width:18.87%"><span>10w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">9</span>Advanced orders</div><div class="tl-track"><div class="tl-bar s-product" style="left:45.28%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">10</span>Algo orders</div><div class="tl-track"><div class="tl-bar s-product" style="left:56.60%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">11</span>Security &amp; compliance</div><div class="tl-track"><div class="tl-bar s-launch" style="left:64.15%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">12</span>Performance &amp; go-live</div><div class="tl-track"><div class="tl-bar s-launch" style="left:75.47%;width:9.43%"><span>5w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">13</span>Ecosystem</div><div class="tl-track"><div class="tl-bar s-launch" style="left:84.91%;width:15.09%"><span>8w</span></div></div></div><div class="tl-legend"><span class="s-platform"></span>Platform <span class="s-product"></span>Product <span class="s-launch"></span>Launch<em>Indicative: one small team with two parallel streams</em></div></div>
+<hr />
+</section><section class="card phase"><h2 id="phase-1-delivery-foundations-cicd-and-containerisation">Phase 1: Delivery foundations (CI/CD and containerisation)</h2>
+<p><strong>Goal:</strong> every component builds, tests and ships as a container image from a pipeline. A developer can start the
+whole stack with one command.</p>
+<ul>
+<li><strong>Build quality:</strong> Maven wrapper, Checkstyle/Spotless formatting, SpotBugs, dependency and vulnerability scanning (OWASP / Dependabot), JaCoCo gate (already in place).</li>
+<li><strong>CI pipeline</strong> (GitHub Actions): build → unit tests → Aeron integration tests → coverage → image build → push to registry. Run nightly JMH benchmarks and keep a history of the results.</li>
+<li><strong>Containers:</strong></li>
+<li>Multi-stage Dockerfiles on JDK 21 (Temurin) with distroless or slim runtime images and a non-root user.</li>
+<li><strong>Matching engine</strong> image. The Aeron directory lives on <code>/dev/shm</code>, so give the container enough <code>--shm-size</code>; set <code>ulimit</code> and the JVM flags (<code>--add-exports</code>).</li>
+<li><strong>Standalone Aeron Media Driver</strong> image, shared over IPC by co-located containers through a shared <code>/dev/shm</code> volume, or with <code>ipc: shareable</code> / host IPC.</li>
+<li>Network modes: bridge for development; host networking for UDP performance tests.</li>
+<li><strong>docker-compose</strong> dev stack: media driver, engine, (later) trading service, PostgreSQL, Redis, Prometheus, Grafana, ELK. Profiles: <code>core</code>, <code>full</code>, <code>observability</code>.</li>
+<li><strong>Kubernetes readiness</strong> for the stateless services: Helm charts or Kustomize. The latency-critical core stays on tuned hosts or VMs (see design ADR).</li>
+<li><strong>Versioning and releases:</strong> semantic versions, changelog, image tags tied to git SHAs.</li>
+</ul>
+<p><strong>Exit criteria:</strong> <code>docker compose up</code> runs the engine with a demo client; every merge to <code>main</code> produces tested images.</p>
+</section><section class="card phase"><h2 id="phase-2-engine-durability-and-high-availability">Phase 2: Engine durability and high availability</h2>
+<p><strong>Goal:</strong> no acknowledged order or trade is ever lost, and the engine survives a host failure (design §2.8–2.9).</p>
+<ul>
+<li><strong>Command journal</strong> on Aeron Archive (stream 100); every command is recorded before any of its output is released.</li>
+<li><strong>Snapshots</strong> taken through a barrier command (books, ID counters, <code>bookSequence</code>), stored in the Archive. Cold recovery = snapshot + journal replay. Determinism tests prove that replay produces byte-identical output.</li>
+<li><strong>Primary/standby replication</strong> (streams 101/102), with a <strong>release gate</strong> in SYNC mode (output only after the standby acks) and ASYNC fallback.</li>
+<li><strong>Arbiter/witness</strong> with epoch fencing; automatic failover; client resend by <code>clOrdId</code> with engine-side deduplication.</li>
+<li><strong>Duplicate <code>clOrdId</code> detection</strong> per user, so a resend after failover is safe.</li>
+<li><strong>Rolling upgrades</strong> (upgrade standby → switch over → upgrade old primary); schema versioning rules for the protocol.</li>
+<li><strong>Chaos tests:</strong> kill the primary mid-burst, drop packets on the replication link, fill the disk.</li>
+</ul>
+<p><strong>Exit criteria:</strong> primary killed under load, standby promoted in &lt; 1 s, zero lost or duplicated fills (verified by reconciliation).</p>
+</section><section class="card phase"><h2 id="phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">Phase 3: Observability I: comprehensive metrics (Prometheus and Grafana)</h2>
+<p><strong>Goal:</strong> latency, throughput and health of every component are visible in real time.</p>
+<ul>
+<li><strong>Engine metrics</strong> collected off the hot path: Agrona counters and HdrHistograms written by the engine threads, read and exported by a separate <strong>metrics agent</strong> thread.</li>
+<li>Per-stage latency (ingress → match → publish), commands/s by type, rejects by reason, trades/s, volume per instrument.</li>
+<li>Ring buffer remaining capacity, order pool usage, book depth and resting order count per instrument.</li>
+<li>Publisher drops (not connected / back-pressured), journal and replication lag, snapshot duration.</li>
+<li><strong>Aeron metrics</strong> from the driver's CnC counters: NAKs, retransmits, back-pressure events, receiver/sender positions, errors from the driver error log.</li>
+<li><strong>JVM metrics</strong> (Micrometer): GC, heap, threads, safepoints. Host metrics through node-exporter.</li>
+<li><strong>Prometheus</strong> scrape configs, recording rules and <strong>alert rules</strong>:</li>
+<li>latency SLO breach;</li>
+<li>ring buffer more than 50% full;</li>
+<li>replication lag;</li>
+<li>publisher drops;</li>
+<li>failover events;</li>
+<li>error rates.</li>
+<li><strong>Grafana dashboards</strong> provisioned as code:</li>
+<li>Engine Overview;</li>
+<li>Latency Heatmaps;</li>
+<li>Aeron Transport;</li>
+<li>Market Activity per instrument;</li>
+<li>JVM/Host;</li>
+<li>Business KPIs (orders, users, volume).</li>
+<li>Later phases add trading service, web and database metrics to the same stack (OpenTelemetry for the request paths).</li>
+</ul>
+<p><strong>Exit criteria:</strong> dashboards in the compose stack; alerts fire in a chaos drill; a load test's latency profile is visible end to end.</p>
+</section><section class="card phase"><h2 id="phase-4-observability-ii-logging-review-and-log-search-for-the-support-desk-elk-kibana">Phase 4: Observability II: logging review and log search for the support desk (ELK / Kibana)</h2>
+<p><strong>Goal:</strong> a support agent can answer "where is my order / why was it rejected / why did it fill at that price" in
+under a minute, without asking an engineer.</p>
+<ul>
+<li><strong>Logging review and standards:</strong></li>
+<li>Structured JSON logs, using SLF4J + Logback with a JSON encoder (replacing <code>System.Logger</code>).</li>
+<li>Consistent fields: <code>service</code>, <code>instrument</code>, <code>userId</code>, <code>orderId</code>, <code>clOrdId</code>, <code>engineSeq</code>, <code>tradeId</code>, <code>correlationId</code>.</li>
+<li>Asynchronous, garbage-free appenders. The matching hot path never logs; it emits events.</li>
+<li><strong>Order audit trail:</strong> a dedicated <strong>audit/event logger</strong> service subscribes to streams 2001/3001 (and later the journal) and writes one human-readable, searchable record per order lifecycle event and per trade. This is the support desk's single source of truth.</li>
+<li><strong>Pipeline:</strong> Filebeat/Fluent Bit → Logstash or ingest pipelines → <strong>Elasticsearch</strong> → <strong>Kibana</strong>. Index lifecycle (hot/warm/delete), retention aligned with regulatory requirements.</li>
+<li><strong>Kibana for support:</strong></li>
+<li>Saved searches: <em>order lifecycle by clOrdId/orderId</em>, <em>all activity for a user</em>, <em>rejects by reason</em>, <em>cancels and STP events</em>, <em>trades by instrument and time</em>.</li>
+<li>Support dashboard with reject reasons over time, top users by rejects, and error spikes.</li>
+<li>Role-based access (support desk = read-only, PII masking).</li>
+<li><strong>Runbooks</strong> linked from alerts and dashboards (common customer questions, failover, stuck orders).</li>
+</ul>
+<p><strong>Exit criteria:</strong> given only a client order id, a support agent finds the full lifecycle (accepted → fills → cancel/reject reason) in Kibana.</p>
+</section><section class="card phase"><h2 id="phase-5-engine-admin-and-direct-access">Phase 5: Engine admin and direct access</h2>
+<p><strong>Goal:</strong> operators can inspect and control the engine directly, independently of the trading service, safely and
+with an audit trail.</p>
+<ul>
+<li><strong>Admin command stream</strong> (new stream, e.g. 1101) with authenticated, signed admin commands, journaled like every other command so that admin actions are deterministic and replayable:</li>
+<li>halt/resume an instrument;</li>
+<li>cancel-all for an instrument;</li>
+<li>cancel all of a user's orders;</li>
+<li>suspend/unsuspend a user;</li>
+<li>add an instrument or change its parameters (tick, lot, collar, bands);</li>
+<li>force a snapshot;</li>
+<li>change the log level.</li>
+<li><strong>Direct read access:</strong></li>
+<li>full <strong>L3 order book</strong> (every order with its queue position);</li>
+<li>order lookup by <code>orderId</code> / <code>clOrdId</code> / user;</li>
+<li>per-user open orders;</li>
+<li>engine statistics.</li>
+<li>Served by a <strong>query/replica agent</strong> that rebuilds state from the event stream (or runs on the standby), so reads never touch the matching threads.</li>
+<li><strong>Admin tools:</strong> <code>flashex-admin</code> CLI (Aeron client) and later an <strong>admin console</strong> in the back-office UI (Phase 8/11), with maker-checker approval for destructive operations.</li>
+<li><strong>Audit:</strong> every admin action is recorded with operator, reason and before/after state, and is searchable in Kibana.</li>
+</ul>
+<p><strong>Exit criteria:</strong> an operator halts EURUSD, inspects the L3 book, cancels one user's orders and resumes, all audited, with no trading service involved.</p>
+</section><section class="card phase"><h2 id="phase-6-accounts-and-risk-in-the-engine">Phase 6: Accounts and risk in the engine</h2>
+<p><strong>Goal:</strong> funds are checked and moved atomically with matching (design ADR-002).</p>
+<ul>
+<li>Per-user, per-currency <strong>balances</strong>: available, held and pending withdrawal, partitioned into risk shards.</li>
+<li><strong>Pre-trade holds</strong> (limit at price × qty × (1+fee); market at the collar price; sell = base qty), with release on cancel or remainder.</li>
+<li><strong>Post-trade settlement</strong> of buyer and seller, <strong>maker/taker fees</strong>, and a fee account. New <code>BalanceUpdate</code> / <code>DepositCredited</code> events.</li>
+<li><strong>Deposit / withdraw</strong> commands (idempotent on <code>fundingTxId</code>).</li>
+<li>Reconciliation invariant checked continuously: Σ balances = Σ deposits − Σ withdrawals.</li>
+<li><strong>Price bands / circuit breakers:</strong> reject orders outside ±X% of the reference price and auto-halt on extreme moves.</li>
+<li>Randomised tests extended to conservation of funds.</li>
+</ul>
+<p><strong>Exit criteria:</strong> randomised test of 1 M commands with deposits, trades and cancels keeps the funds invariant; insufficient-funds rejects are correct.</p>
+</section><section class="card phase"><h2 id="phase-7-trading-service-and-backend-services-fully-containerised-and-tested">Phase 7: Trading Service and backend services (fully containerised and tested)</h2>
+<p><strong>Goal:</strong> the complete backend from the design runs in Docker with unit and integration tests.</p>
+<ul>
+<li><strong>Trading Service</strong> (Netty, Disruptor, Aeron):</li>
+<li>WebSocket and REST APIs; JWT session authentication.</li>
+<li>Validation, rate limiting and idempotency (Redis), soft funds check.</li>
+<li>Command encoding, then routing of private events back to the user's sessions.</li>
+<li>L2 book replicas with gap recovery and conflation (≤ 20 Hz).</li>
+<li>Own-order queue position; ticker and recent trades.</li>
+<li><strong>Identity Service:</strong> registration, email verification, login, 2FA (TOTP), refresh tokens, sessions/devices, user settings (theme, colour scheme, defaults).</li>
+<li><strong>Funding Service:</strong> fiat deposits through a <strong>mock payment provider</strong>, double-entry ledger, <code>Deposit</code> commands, reconciliation job.</li>
+<li><strong>History Service:</strong> records events into PostgreSQL; serves order and trade history, portfolio valuation, <strong>OHLCV candles</strong> (1m–1d) and 24h stats; CSV export.</li>
+<li><strong>Edge / API gateway</strong> (Envoy/Nginx): TLS, routing, WAF basics, sticky WebSockets.</li>
+<li><strong>Data stores:</strong> PostgreSQL (Flyway migrations), Redis.</li>
+<li><strong>Tests:</strong></li>
+<li>unit tests per service;</li>
+<li><strong>Testcontainers</strong> integration tests (PostgreSQL, Redis, real engine + media driver);</li>
+<li>contract tests for the WS/REST API (OpenAPI / AsyncAPI specs);</li>
+<li>end-to-end tests with simulated trader bots in docker-compose;</li>
+<li>coverage gates as for the engine.</li>
+<li><strong>docker-compose <code>full</code> profile:</strong> edge, identity, funding, history, trading service, media driver, engine, PostgreSQL, Redis and the observability stack.</li>
+</ul>
+<p><strong>Exit criteria:</strong> a scripted user registers, deposits, places/cancels orders and sees fills and history entirely through the public APIs, in containers, in CI.</p>
+</section><section class="card phase"><h2 id="phase-8-web-trading-platform">Phase 8: Web trading platform</h2>
+<p><strong>Goal:</strong> the modern, responsive trading UI from the spec (see <code>mockups/</code> for the target look).</p>
+<ul>
+<li><strong>Onboarding:</strong> registration, email verification, login, 2FA, password reset, session/device management.</li>
+<li><strong>Settings:</strong> light/dark/system theme, colour scheme (incl. colour-blind and red-up/green-down), default pair, order type and TIF (GTC preselected), confirmations, layout persistence.</li>
+<li><strong>Funding:</strong> deposit fiat (mock PSP), deposit history, balances.</li>
+<li><strong>Trade screen:</strong></li>
+<li>pair selector with 24h ticker;</li>
+<li><strong>price chart</strong> (candles, line/area, volume, MA/EMA, Bollinger; 1m–1d) and <strong>depth chart</strong>;</li>
+<li><strong>order book</strong> with bid/ask side by side, per-level total, cumulative depth bars and <strong>own-order highlight</strong>;</li>
+<li>order entry (limit/market, TIF, post-only, % of balance, fee estimate, confirmation);</li>
+<li>recent trades.</li>
+<li><strong>Blotters:</strong> open orders (live, partial fills, cancel and cancel-all), order history, trades/fills, portfolio (balances, holdings, valuation, allocation, P&amp;L); filters and CSV export.</li>
+<li><strong>Real-time:</strong> WebSocket client in a Web Worker, sequence-gap recovery, reconnect with backoff, connection status, toast notifications for fills.</li>
+<li><strong>Quality:</strong> responsive (desktop, tablet, mobile), WCAG 2.1 AA, Playwright end-to-end tests, visual regression tests, Lighthouse ≥ 90; served from a container behind the edge.</li>
+</ul>
+<p><strong>Exit criteria:</strong> a user runs the full journey in the browser (register → deposit → trade → cancel → review blotters) in light and dark themes on desktop and mobile.</p>
+</section><section class="card phase"><h2 id="phase-9-advanced-order-types">Phase 9: Advanced order types</h2>
+<p><strong>Goal:</strong> professional order types. Note: <strong>IOC and FOK are already in the engine</strong>; this phase exposes them end
+to end and adds conditional orders.</p>
+<table>
+<thead>
+<tr>
+<th>Order type</th>
+<th>Behaviour</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IOC / FOK</td>
+<td>Already in the engine; expose in API and UI</td>
+<td>Engine <span class="ok">✅</span>, TS, UI</td>
+</tr>
+<tr>
+<td><strong>GTD</strong></td>
+<td>Good till date/time; expiry driven by journaled timer commands</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>Stop (stop-loss market)</strong></td>
+<td>Becomes a market order when the last trade price crosses the trigger</td>
+<td>Engine (trigger book)</td>
+</tr>
+<tr>
+<td><strong>Stop-limit</strong></td>
+<td>Becomes a limit order when triggered</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>Take-profit / take-profit-limit</strong></td>
+<td>Mirror of stop on the profit side</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>OCO (one-cancels-other)</strong></td>
+<td>Linked pair (e.g. take-profit + stop-loss); a fill or trigger of one cancels the other</td>
+<td>Engine (order lists)</td>
+</tr>
+<tr>
+<td><strong>Bracket / OTO</strong></td>
+<td>Entry order that on fill places a linked OCO exit pair</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>Trailing stop</strong></td>
+<td>Trigger follows the market by a fixed offset or percentage</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>Amend (cancel/replace)</strong></td>
+<td>Change price/qty; keeps priority on a qty decrease, loses it on a price change or qty increase</td>
+<td>Engine</td>
+</tr>
+<tr>
+<td><strong>Reduce-only / max-show</strong></td>
+<td>Margin-era flags, reserved</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The engine keeps a per-instrument <strong>trigger book</strong> (stop orders sorted by trigger price) that is evaluated after each trade, deterministically within the same command.</li>
+<li>The holds model is extended for conditional orders (hold at activation or at placement; configurable).</li>
+<li>The UI gets order entry tabs for Stop/OCO/Trailing and shows conditional orders in the blotter.</li>
+</ul>
+<p><strong>Exit criteria:</strong> randomised plus scenario tests for trigger cascades (one trade triggering several stops), OCO race conditions and GTD expiry across failover.</p>
+</section><section class="card phase"><h2 id="phase-10-algorithmic-orders">Phase 10: Algorithmic orders</h2>
+<p><strong>Goal:</strong> execution algorithms for larger traders. Simple native types run <strong>in the engine</strong>. Time- or
+volume-scheduled algos run in a separate <strong>Algo Engine</strong> service that sends child orders through the normal
+command path, so the matching engine stays simple and fast.</p>
+<table>
+<thead>
+<tr>
+<th>Algo</th>
+<th>Description</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Iceberg</strong></td>
+<td>Shows only a visible slice; refills from the hidden quantity with new time priority on each refresh</td>
+<td>Engine (native)</td>
+</tr>
+<tr>
+<td><strong>Pegged (primary / mid / market peg)</strong></td>
+<td>Price follows the best bid/ask or the mid, optionally with an offset; re-prices on book changes ("sliding")</td>
+<td>Engine (native)</td>
+</tr>
+<tr>
+<td><strong>Sliding / auto-reprice post-only</strong></td>
+<td>Post-only that slides to the best non-crossing price instead of being rejected</td>
+<td>Engine (native)</td>
+</tr>
+<tr>
+<td><strong>TWAP</strong></td>
+<td>Splits the parent order evenly over a time window</td>
+<td>Algo Engine</td>
+</tr>
+<tr>
+<td><strong>VWAP</strong></td>
+<td>Follows a historical or live volume curve</td>
+<td>Algo Engine</td>
+</tr>
+<tr>
+<td><strong>POV (participation)</strong></td>
+<td>Targets X% of market volume</td>
+<td>Algo Engine</td>
+</tr>
+<tr>
+<td><strong>Implementation shortfall / arrival price</strong></td>
+<td>Balances urgency against market impact</td>
+<td>Algo Engine</td>
+</tr>
+<tr>
+<td><strong>Sniper / liquidity seeking</strong></td>
+<td>Waits and takes liquidity when it appears at or better than a limit</td>
+<td>Algo Engine</td>
+</tr>
+<tr>
+<td><strong>Randomised iceberg</strong></td>
+<td>Iceberg with randomised slice sizes and timing</td>
+<td>Engine + Algo</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Parent/child order model, algo state persistence and recovery, kill switch, per-user algo limits.</li>
+<li><strong>Back-testing harness</strong> against recorded market data (from the journal) and a <strong>market simulator</strong> for tests.</li>
+<li>UI: algo order ticket, parent/child view in the blotter, progress bars.</li>
+</ul>
+<p><strong>Exit criteria:</strong> each algo validated in the simulator and on the test environment with recorded flow; the kill switch cancels all child orders within one second.</p>
+</section><section class="card phase"><h2 id="phase-11-security-compliance-and-market-integrity">Phase 11: Security, compliance and market integrity</h2>
+<ul>
+<li><strong>Identity hardening:</strong> 2FA enforcement policies, device binding, brute-force protection, account recovery flows.</li>
+<li><strong>KYC/AML:</strong> tiered verification with a provider integration, sanctions screening, limits by tier, transaction monitoring.</li>
+<li><strong>Withdrawals:</strong> verified bank accounts, approval workflows, velocity limits.</li>
+<li><strong>Market surveillance:</strong> detection of wash trading, spoofing/layering, marking the close and momentum ignition; alerts to compliance.</li>
+<li><strong>Back-office / admin console:</strong> user management, instrument management, fee schedules, manual adjustments with maker-checker, reports.</li>
+<li><strong>Security engineering:</strong> threat model, secrets in Vault/KMS, TLS everywhere, network policies, container image signing (cosign) and SBOMs, penetration test, OWASP ASVS L2 review, bug bounty readiness.</li>
+<li><strong>Regulatory reporting</strong> and statements: trade reports, monthly statements, tax exports. Data retention and GDPR (export/erasure with financial-record exceptions).</li>
+</ul>
+</section><section class="card phase"><h2 id="phase-12-performance-resilience-and-go-live">Phase 12: Performance, resilience and go-live</h2>
+<ul>
+<li><strong>Load and soak tests:</strong> simulated traders at 2× the expected peak for 24 h; coordinated-omission-safe latency measurement end to end (browser → engine → browser).</li>
+<li><strong>Engine tuning:</strong></li>
+<li>thread affinity and core isolation;</li>
+<li>busy-spin wait strategies;</li>
+<li>kernel-bypass evaluation (e.g. ef_vi / Onload);</li>
+<li>GC verification (zero allocation on the hot path, checked with Epsilon GC).</li>
+<li><strong>Chaos and DR:</strong> failover drills, region/datacentre DR with archive replication, backup/restore of PostgreSQL, game days.</li>
+<li><strong>Environments:</strong> dev → test → staging (production-like) → production; infrastructure as code (Terraform / Ansible); blue/green for the stateless services.</li>
+<li><strong>Operational readiness:</strong> SLOs and error budgets, on-call rota, runbooks, incident process, status page.</li>
+<li><strong>Launch:</strong> closed beta with invited users and market makers, then public launch.</li>
+</ul>
+</section><section class="card phase"><h2 id="phase-13-ecosystem-and-growth-post-launch">Phase 13: Ecosystem and growth (post-launch)</h2>
+<ul>
+<li><strong>Public trading API:</strong> REST and WebSocket with API keys and scopes, docs portal, sandbox environment, SDKs (Python, TypeScript, Java).</li>
+<li><strong>FIX 4.4 gateway</strong> for institutional clients, plus a <strong>drop-copy</strong> service.</li>
+<li><strong>Market data products:</strong> public L2/L3 feeds, historical data downloads, candles API.</li>
+<li><strong>Market maker programme:</strong> fee tiers, rebates, maker obligations monitoring.</li>
+<li><strong>More instruments:</strong> additional FX pairs and crosses, and potentially crypto/fiat pairs (requires custody).</li>
+<li><strong>Mobile apps</strong> (React Native) and push notifications.</li>
+<li><strong>Analytics:</strong> user P&amp;L analytics, trade cost analysis (TCA) for algo users.</li>
+<li><strong>Later product lines</strong> (out of current scope): margin trading, perpetuals/forwards, lending.</li>
+</ul>
+<hr />
+</section><section class="card"><h2 id="cross-cutting-work-runs-through-every-phase">Cross-cutting work (runs through every phase)</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Testing</td>
+<td>Unit + randomised/property + integration (Testcontainers / real Aeron) + E2E; coverage gates; determinism tests for the engine</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>JMH benchmarks tracked in CI; latency budgets per hop; regressions fail the build</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>Design docs updated per phase; ADRs for every significant decision; API specs (OpenAPI/AsyncAPI)</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>Dependency scanning, secret scanning, least privilege, security review per phase</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Every new component ships with metrics, structured logs and a dashboard</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Schema migrations (Flyway), protocol versioning rules, backward-compatible events</td>
+</tr>
+</tbody>
+</table>
+</section><section class="card"><h2 id="mockups">Mockups</h2>
+<p>Target look of the web platform (Phase 8): see <a href="mockups/"><code>mockups/</code></a>.</p>
+<div class="gallery"><figure><figcaption>Trade screen</figcaption><div class="pair-imgs"><a href="mockups/trade-light.png"><img src="mockups/trade-light.png" alt="Trade screen light" loading="lazy"><span>Light</span></a><a href="mockups/trade-dark.png"><img src="mockups/trade-dark.png" alt="Trade screen dark" loading="lazy"><span>Dark</span></a></div></figure><figure><figcaption>Full chart: candlesticks, MA, Bollinger, RSI</figcaption><div class="pair-imgs"><a href="mockups/chart-candles-light.png"><img src="mockups/chart-candles-light.png" alt="Full chart: candlesticks, MA, Bollinger, RSI light" loading="lazy"><span>Light</span></a><a href="mockups/chart-candles-dark.png"><img src="mockups/chart-candles-dark.png" alt="Full chart: candlesticks, MA, Bollinger, RSI dark" loading="lazy"><span>Dark</span></a></div></figure><figure><figcaption>Full chart: area + market depth</figcaption><div class="pair-imgs"><a href="mockups/chart-area-light.png"><img src="mockups/chart-area-light.png" alt="Full chart: area + market depth light" loading="lazy"><span>Light</span></a><a href="mockups/chart-area-dark.png"><img src="mockups/chart-area-dark.png" alt="Full chart: area + market depth dark" loading="lazy"><span>Dark</span></a></div></figure></div></section></main>
+<script>
+function toggleTheme(){const r=document.documentElement;const d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';try{localStorage.setItem('fx-rm-theme',r.dataset.theme)}catch(e){}}
+try{const t=localStorage.getItem('fx-rm-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+const links=[...document.querySelectorAll('.side a')];const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const id=e.target.querySelector('h2')?.id;links.forEach(l=>l.classList.toggle('on',l.getAttribute('href')==='#'+id))}}),{rootMargin:'-35% 0px -60% 0px'});document.querySelectorAll('section.card').forEach(s=>io.observe(s));
+</script></body></html>
