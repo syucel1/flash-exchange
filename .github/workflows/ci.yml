@@ -106,7 +106,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Vulnerability scan (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: flash-exchange:ci
           severity: CRITICAL
@@ -114,7 +114,7 @@ jobs:
           exit-code: "1"
 
       - name: Vulnerability report (HIGH, informational)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: flash-exchange:ci
           severity: HIGH
