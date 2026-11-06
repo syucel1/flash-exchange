@@ -112,6 +112,15 @@ Single matcher thread, including encoding of all output, on a 2-vCPU cloud sandb
 p50 ≈ 0.4 µs, p99 ≈ 1.3 µs per command, measured in-process without Aeron. Tuned hosts with `BUSY_SPIN`, a
 `DEDICATED` driver and pinned cores will do better. Benchmark with JMH before relying on these numbers.
 
+## Operations endpoint and demo trader
+
+* `flash.engine.http.port=8080` enables a small HTTP endpoint on its own thread: `GET /health` (200 UP / 503 DOWN,
+  used by container health checks) and `GET /status` (version, channels, counters, publisher drops). Disabled (-1)
+  by default.
+* `com.flashexchange.engine.tools.DemoTrader [demo.properties]` simulates users sending limit and market orders and
+  cancels over IPC or UDP and prints a trading summary. It powers the docker-compose stack and the smoke test (see
+  `docker/config/demo-*.properties`).
+
 ## Next steps (not in this stage)
 
 Command journal (Aeron Archive) and primary/standby replication, risk and balance holds, the trading service,

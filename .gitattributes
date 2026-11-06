@@ -1,0 +1,13 @@
+# Normalise line endings in the repository to LF; check out Windows scripts with CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+mvnw text eol=lf
+*.sh text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.pdf binary
+*.jar binary
+*.zip binary

@@ -1,0 +1,25 @@
+# FlashEx matching engine on Kubernetes (IPC mode): one pod with the Aeron media driver as a native sidecar
+# (Kubernetes >= 1.29) and the matching engine, sharing a memory-backed /dev/shm.
+#   kubectl apply -k deploy/k8s/base            # engine only
+#   kubectl apply -k deploy/k8s/overlays/dev    # engine + demo trader in the same pod
+# Note: the latency-critical core is intended for tuned hosts; Kubernetes suits dev/test and the later
+# stateless services (see ROADMAP.md, phase 1 and 12).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: flashex
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: flashex
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - matching-engine.yaml
+configMapGenerator:
+  - name: matching-engine-config
+    files:
+      - config/engine.properties
+      - config/media-driver.properties
+images:
+  - name: flash-exchange
+    newName: ghcr.io/syucel1/flash-exchange
+    newTag: main

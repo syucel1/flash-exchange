@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclusions.
+  EI_EXPOSE_REP / EI_EXPOSE_REP2: zero-copy design. Flyweights wrap caller buffers and the engine passes live,
+  pooled objects (orders, books, publishers) to its collaborators on purpose to avoid allocation and copying.
+-->
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

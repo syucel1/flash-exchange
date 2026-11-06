@@ -60,6 +60,7 @@
                     <archive>
                         <manifest>
                             <mainClass>${main.class}</mainClass>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
                     </archive>
                 </configuration>
@@ -84,6 +85,9 @@
                                     <manifestEntries>
                                         <Add-Exports>java.base/jdk.internal.misc</Add-Exports>
                                         <Add-Opens>java.base/sun.nio.ch</Add-Opens>
+                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Build-Revision>${build.revision}</Build-Revision>
                                     </manifestEntries>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>

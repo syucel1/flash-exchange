@@ -8,3 +8,8 @@ target/
 .project
 .settings/
 out/
+dependency-reduced-pom.xml
+.flattened-pom.xml
+# local docker volumes / scratch
+.data/
+Claude outputs/

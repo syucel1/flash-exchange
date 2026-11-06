@@ -25,12 +25,24 @@ Architecture diagrams are Graphviz (sources in `docs/diagrams/*.dot`, rendered t
 
 ## Code
 
-| Module | Contents |
+| Module / folder | Contents |
 |---|---|
 | [`protocol/`](protocol) | Binary message flyweights shared by the engine and its clients |
-| [`matching-engine/`](matching-engine) | Matching engine, Disruptor pipeline, Aeron IPC / UDP transport and client ([README](matching-engine/README.md)) |
+| [`matching-engine/`](matching-engine) | Matching engine, Disruptor pipeline, Aeron IPC / UDP transport, HTTP status endpoint, demo trader ([README](matching-engine/README.md)) |
+| [`matching-engine-bench/`](matching-engine-bench) | JMH benchmarks |
+| [`docker/`](docker), [`docker-compose.yml`](docker-compose.yml) | Container image and local stack |
+| [`deploy/k8s/`](deploy/k8s) | Kubernetes (Kustomize) manifests |
+| [`.github/workflows/`](.github/workflows) | CI, release, nightly benchmarks, CodeQL |
 
-Build with JDK 21+ and Maven 3.9+: `mvn verify` runs the unit and Aeron integration tests and the coverage check.
+Quick start (JDK 21 and Docker; no Maven install needed):
+
+```bash
+./mvnw verify                      # build, tests, quality gates
+docker compose up --build          # media driver + matching engine + demo trader
+curl localhost:8080/status
+```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the full developer guide and [CHANGELOG.md](CHANGELOG.md) for changes.
 
 ## Executive summary
 

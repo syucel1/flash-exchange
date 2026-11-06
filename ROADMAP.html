@@ -40,9 +40,9 @@ ul{padding-left:20px}li{margin:3px 0}hr{display:none}
 <nav class="side"><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M18 5 9 18h6l-2 9 10-14h-6l1-8z" fill="#fff"/></svg><span>Flash<b>Ex</b></span></div>
 <div class="sub">Roadmap · v1.0 · Nov 2026</div><a href="#where-we-are">Where we are</a><a href="#phase-overview">Phase overview</a><a href="#phase-1-delivery-foundations-cicd-and-containerisation">1 · Delivery foundations</a><a href="#phase-2-engine-durability-and-high-availability">2 · Engine durability and high availability</a><a href="#phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">3 · Observability I: comprehensive metrics</a><a href="#phase-4-observability-ii-logging-review-and-log-search-for-the-support-desk-elk-kibana">4 · Observability II: logging review and log search for the support desk</a><a href="#phase-5-engine-admin-and-direct-access">5 · Engine admin and direct access</a><a href="#phase-6-accounts-and-risk-in-the-engine">6 · Accounts and risk in the engine</a><a href="#phase-7-trading-service-and-backend-services-fully-containerised-and-tested">7 · Trading Service and backend services</a><a href="#phase-8-web-trading-platform">8 · Web trading platform</a><a href="#phase-9-advanced-order-types">9 · Advanced order types</a><a href="#phase-10-algorithmic-orders">10 · Algorithmic orders</a><a href="#phase-11-security-compliance-and-market-integrity">11 · Security, compliance and market integrity</a><a href="#phase-12-performance-resilience-and-go-live">12 · Performance, resilience and go-live</a><a href="#phase-13-ecosystem-and-growth-post-launch">13 · Ecosystem and growth</a><a href="#cross-cutting-work-runs-through-every-phase">Cross-cutting work</a><a href="#mockups">Mockups</a><button class="tbtn" onclick="toggleTheme()">Toggle light / dark</button></nav>
 <main><div class="hero"><h1>FlashEx Roadmap</h1><p>From a working matching engine to a fully scoped spot FX exchange: 13 phases in dependency order, each ending in something working and testable.</p>
-<div class="kpis"><div><b>13</b><span>phases</span></div><div><b>1 / 13</b><span>engine core delivered</span></div><div><b>~11 months</b><span>to public launch (indicative)</span></div><div><b>126</b><span>tests · 99.9 % coverage today</span></div></div></div>
+<div class="kpis"><div><b>13</b><span>phases</span></div><div><b>Phase 1 ✓</b><span>engine + delivery foundations done</span></div><div><b>~11 months</b><span>to public launch (indicative)</span></div><div><b>126</b><span>tests · 99.9 % coverage today</span></div></div></div>
 
-<p>Status: <strong>v1.0 draft</strong> · Updated: 2026-11-04 · Scope: full spot FX exchange as specified in <a href="README.md"><code>docs/</code></a></p>
+<p>Status: <strong>v1.1</strong> · Updated: 2026-11-06 · Scope: full spot FX exchange as specified in <a href="README.md"><code>docs/</code></a></p>
 <p>The design describes a complete exchange: matching engine, trading service, web platform, identity, funding,
 history, observability and high availability. So far only the <strong>matching engine and its Aeron integration</strong> exist.
 This roadmap orders the remaining work so that each phase builds on the one before it and ends with something
@@ -77,8 +77,12 @@ working and testable.</p>
 <td><span class="ok">✅</span> Done</td>
 </tr>
 <tr>
-<td>Everything else in this document</td>
-<td><span class="todo">⏳</span> Planned</td>
+<td><strong>Phase 1:</strong> Maven wrapper, quality gates, JMH module, container image, docker-compose (IPC + UDP), CI/CD, K8s manifests</td>
+<td><span class="ok">✅</span> Done</td>
+</tr>
+<tr>
+<td>Phases 2–13</td>
+<td><span class="todo">⏳</span> Planned (next: <strong>Phase 2 engine durability and HA</strong>, Phase 3 metrics)</td>
 </tr>
 </tbody>
 </table>
@@ -191,7 +195,7 @@ working and testable.</p>
 7/8 can run in parallel with a second stream of work.</p>
 <div class="timeline"><div class="tl-head"><div class="tl-label"></div><div class="tl-track ticks"><span style="left:0.00%">Nov 26</span><span style="left:8.17%">Dec</span><span style="left:16.34%">Jan 27</span><span style="left:24.51%">Feb</span><span style="left:32.68%">Mar</span><span style="left:40.85%">Apr</span><span style="left:49.02%">May</span><span style="left:57.19%">Jun</span><span style="left:65.36%">Jul</span><span style="left:73.53%">Aug</span><span style="left:81.70%">Sep</span><span style="left:89.87%">Oct</span><span style="left:98.04%">Nov</span></div></div><div class="tl-row"><div class="tl-label"><span class="num">1</span>CI/CD &amp; containers</div><div class="tl-track"><div class="tl-bar s-platform" style="left:0.00%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">2</span>Engine durability &amp; HA</div><div class="tl-track"><div class="tl-bar s-platform" style="left:5.66%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">3</span>Metrics</div><div class="tl-track"><div class="tl-bar s-platform" style="left:5.66%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">4</span>Logging &amp; support</div><div class="tl-track"><div class="tl-bar s-platform" style="left:11.32%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">5</span>Engine admin</div><div class="tl-track"><div class="tl-bar s-platform" style="left:16.98%;width:5.66%"><span>3w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">6</span>Accounts &amp; risk</div><div class="tl-track"><div class="tl-bar s-product" style="left:16.98%;width:9.43%"><span>5w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">7</span>Trading service &amp; backend</div><div class="tl-track"><div class="tl-bar s-product" style="left:26.42%;width:18.87%"><span>10w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">8</span>Web platform</div><div class="tl-track"><div class="tl-bar s-product" style="left:45.28%;width:18.87%"><span>10w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">9</span>Advanced orders</div><div class="tl-track"><div class="tl-bar s-product" style="left:45.28%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">10</span>Algo orders</div><div class="tl-track"><div class="tl-bar s-product" style="left:56.60%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">11</span>Security &amp; compliance</div><div class="tl-track"><div class="tl-bar s-launch" style="left:64.15%;width:11.32%"><span>6w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">12</span>Performance &amp; go-live</div><div class="tl-track"><div class="tl-bar s-launch" style="left:75.47%;width:9.43%"><span>5w</span></div></div></div><div class="tl-row"><div class="tl-label"><span class="num">13</span>Ecosystem</div><div class="tl-track"><div class="tl-bar s-launch" style="left:84.91%;width:15.09%"><span>8w</span></div></div></div><div class="tl-legend"><span class="s-platform"></span>Platform <span class="s-product"></span>Product <span class="s-launch"></span>Launch<em>Indicative: one small team with two parallel streams</em></div></div>
 <hr />
-</section><section class="card phase"><h2 id="phase-1-delivery-foundations-cicd-and-containerisation">Phase 1: Delivery foundations (CI/CD and containerisation)</h2>
+</section><section class="card phase"><h2 id="phase-1-delivery-foundations-cicd-and-containerisation">Phase 1: Delivery foundations (CI/CD and containerisation) <span class="ok">✅</span></h2>
 <p><strong>Goal:</strong> every component builds, tests and ships as a container image from a pipeline. A developer can start the
 whole stack with one command.</p>
 <ul>
@@ -207,6 +211,15 @@ whole stack with one command.</p>
 <li><strong>Versioning and releases:</strong> semantic versions, changelog, image tags tied to git SHAs.</li>
 </ul>
 <p><strong>Exit criteria:</strong> <code>docker compose up</code> runs the engine with a demo client; every merge to <code>main</code> produces tested images.</p>
+<p><strong>Delivered (2026-11-06):</strong>
+- Maven Wrapper; Checkstyle, SpotBugs, JaCoCo and optional OWASP gates; <code>.editorconfig</code> / <code>.gitattributes</code>.
+- <code>matching-engine-bench</code> (JMH).
+- Engine <code>/health</code> and <code>/status</code> endpoint; <code>DemoTrader</code> load generator.
+- A single non-root image with roles <code>media-driver | matching-engine | demo-trader</code>.
+- <code>docker-compose.yml</code> with an IPC stack and a <code>udp</code> profile; compose smoke test.
+- Workflows: CI (tests → image → Trivy → smoke → GHCR), release, nightly benchmarks, CodeQL; Dependabot.
+- Kustomize manifests with the media driver as a native sidecar.</p>
+<p>See <code>DEVELOPMENT.md</code> and <code>CHANGELOG.md</code>.</p>
 </section><section class="card phase"><h2 id="phase-2-engine-durability-and-high-availability">Phase 2: Engine durability and high availability</h2>
 <p><strong>Goal:</strong> no acknowledged order or trade is ever lost, and the engine survives a host failure (design §2.8–2.9).</p>
 <ul>

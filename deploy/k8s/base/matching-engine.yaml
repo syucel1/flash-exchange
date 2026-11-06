@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matching-engine
+  labels:
+    app.kubernetes.io/name: matching-engine
+spec:
+  replicas: 1                      # single writer: never run two engines on the same streams
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: matching-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: matching-engine
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: media-driver       # native sidecar: starts first, stops last
+          image: flash-exchange
+          args: ["media-driver"]
+          restartPolicy: Always
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms128m -Xmx128m"
+          startupProbe:
+            exec:
+              command: ["/opt/flashex/bin/entrypoint.sh", "driver-health"]
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {memory: 512Mi}
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: shm, mountPath: /dev/shm}
+            - {name: tmp, mountPath: /tmp}
+            - {name: config, mountPath: /opt/flashex/config}
+      containers:
+        - name: matching-engine
+          image: flash-exchange
+          args: ["matching-engine"]
+          env:
+            - name: JAVA_OPTS
+              value: "-XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx512m"
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: {cpu: "1", memory: 768Mi}
+            limits: {memory: 1Gi}
+          securityContext: *container-security
+          volumeMounts:
+            - {name: shm, mountPath: /dev/shm}
+            - {name: tmp, mountPath: /tmp}
+            - {name: config, mountPath: /opt/flashex/config}
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: tmp
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: matching-engine-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: matching-engine
+  labels:
+    app.kubernetes.io/name: matching-engine
+spec:
+  selector:
+    app.kubernetes.io/name: matching-engine
+  ports:
+    - {name: http, port: 8080, targetPort: http}
