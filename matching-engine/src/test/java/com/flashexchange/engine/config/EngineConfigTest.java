@@ -46,6 +46,8 @@ class EngineConfigTest
         assertEquals(0, config.snapshotDepth());
         assertEquals(1000, config.publishRetryTimeoutMs());
         assertEquals(5000, config.shutdownTimeoutMs());
+        assertEquals("0.0.0.0", config.httpHost());
+        assertEquals(-1, config.httpPort());
         assertTrue(config.toString().contains("transport=IPC"));
     }
 
@@ -104,6 +106,8 @@ class EngineConfigTest
         p.setProperty("flash.engine.snapshot.depth", "20");
         p.setProperty("flash.engine.publish.retryTimeoutMs", "5");
         p.setProperty("flash.engine.shutdownTimeoutMs", "6");
+        p.setProperty("flash.engine.http.host", "127.0.0.1");
+        p.setProperty("flash.engine.http.port", "8080");
         p.setProperty("flash.engine.instruments", "1,EURUSD,1,100,100,10000000,500; 2,GBPUSD,1,100,100,10000000,0;");
 
         final EngineConfig c = EngineConfig.fromProperties(p);
@@ -129,6 +133,8 @@ class EngineConfigTest
         assertEquals(20, c.snapshotDepth());
         assertEquals(5, c.publishRetryTimeoutMs());
         assertEquals(6, c.shutdownTimeoutMs());
+        assertEquals("127.0.0.1", c.httpHost());
+        assertEquals(8080, c.httpPort());
         assertEquals(2, c.instruments().size());
         assertEquals("GBPUSD", c.instruments().get(1).symbol());
         assertEquals(0, c.instruments().get(1).collarBps());
@@ -194,6 +200,10 @@ class EngineConfigTest
         assertInvalid(EngineConfig.builder().publishRetryTimeoutMs(-1));
         assertInvalid(EngineConfig.builder().shutdownTimeoutMs(-1));
         assertInvalid(EngineConfig.builder().termLength(1000));
+        assertInvalid(EngineConfig.builder().httpPort(-2));
+        assertInvalid(EngineConfig.builder().httpPort(65536));
+        assertThrows(NullPointerException.class,
+            () -> EngineConfig.builder().addInstrument(EURUSD).httpHost(null).build());
         assertInvalid(EngineConfig.builder().termLength(32768));
         assertInvalid(EngineConfig.builder().termLength(100_000));
         assertNotNull(EngineConfig.builder().termLength(65536).instruments(List.of(EURUSD)).build());

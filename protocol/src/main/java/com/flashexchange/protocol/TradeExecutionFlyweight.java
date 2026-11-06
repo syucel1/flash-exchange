@@ -1,7 +1,8 @@
 package com.flashexchange.protocol;
 
 /**
- * Event: one trade between a buy and a sell order (stream 2001). This is the record downstream settlement and portfolio systems consume.
+ * Event: one trade between a buy and a sell order (stream 2001). This is the record downstream settlement and
+ * portfolio systems consume.
  * <p>
  * Root block layout (little-endian, offsets relative to the end of the {@link MessageHeader}):
  * <pre>

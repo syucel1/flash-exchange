@@ -1,0 +1,95 @@
+# FlashEx local stack.
+#
+#   ./mvnw -DskipTests package                 # build the application jar
+#   docker compose up --build                  # media driver + matching engine + demo trader over IPC
+#   docker compose --profile udp up --build    # additionally: engine and demo trader on separate "boxes" over UDP
+#   curl localhost:8080/status                 # engine status (IPC stack); UDP engine on localhost:8081
+#
+# Later phases add profiles: observability (Prometheus/Grafana, ELK) and full (trading service, web, data stores).
+
+x-flashex: &flashex
+  image: ${FLASHEX_IMAGE:-flash-exchange:local}
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    args:
+      BASE_IMAGE: ${BASE_IMAGE:-eclipse-temurin:21-jre-noble}
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # ---- same box: one media driver, IPC over a shared /dev/shm ------------------------------------------------
+  media-driver:
+    <<: *flashex
+    command: ["media-driver"]
+    ipc: shareable
+    shm_size: 512m
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx128m"
+    healthcheck:
+      test: ["CMD", "/opt/flashex/bin/entrypoint.sh", "driver-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  matching-engine:
+    <<: *flashex
+    command: ["matching-engine"]
+    ipc: "service:media-driver"
+    depends_on:
+      media-driver:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD", "/opt/flashex/bin/entrypoint.sh", "health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+
+  demo-trader:
+    <<: *flashex
+    command: ["demo-trader"]
+    ipc: "service:media-driver"
+    depends_on:
+      matching-engine:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx128m"
+
+  # ---- across boxes: separate media drivers, Aeron reliable UDP between containers ---------------------------
+  matching-engine-udp:
+    <<: *flashex
+    profiles: ["udp"]
+    hostname: matching-engine-udp
+    command: ["matching-engine", "/opt/flashex/config/engine-udp.properties"]
+    shm_size: 512m
+    ports:
+      - "8081:8080"
+    environment:
+      JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD", "/opt/flashex/bin/entrypoint.sh", "health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+
+  demo-trader-udp:
+    <<: *flashex
+    profiles: ["udp"]
+    hostname: demo-trader-udp
+    command: ["demo-trader", "/opt/flashex/config/demo-udp.properties"]
+    shm_size: 256m
+    depends_on:
+      matching-engine-udp:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx128m"

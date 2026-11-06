@@ -1,0 +1,5 @@
+# Only the built application jar, the entrypoint and runtime config are needed in the image build context.
+**
+!matching-engine/target/matching-engine-*-all.jar
+!docker/entrypoint.sh
+!docker/config/**

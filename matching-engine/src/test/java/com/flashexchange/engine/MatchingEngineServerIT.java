@@ -463,6 +463,34 @@ class MatchingEngineServerIT
     }
 
     @Test
+    void httpHealthAndStatusEndpoints() throws Exception
+    {
+        final MatchingEngineServer server = track(MatchingEngineServer.launch(baseConfig("http").httpPort(0).build()));
+        assertTrue(server.httpPort() > 0);
+        assertTrue(server.isHealthy());
+        final java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
+        final java.net.http.HttpResponse<String> health = http.send(java.net.http.HttpRequest.newBuilder(
+            java.net.URI.create("http://127.0.0.1:" + server.httpPort() + "/health")).build(),
+            java.net.http.HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, health.statusCode());
+        final java.net.http.HttpResponse<String> status = http.send(java.net.http.HttpRequest.newBuilder(
+            java.net.URI.create("http://127.0.0.1:" + server.httpPort() + "/status")).build(),
+            java.net.http.HttpResponse.BodyHandlers.ofString());
+        assertTrue(status.body().contains("\"status\":\"UP\""), status.body());
+        assertTrue(status.body().contains("\"instruments\":[\"EURUSD\",\"GBPUSD\",\"USDJPY\"]"), status.body());
+        assertTrue(status.body().contains("\"name\":\"execution\""), status.body());
+        assertEquals("dev", MatchingEngineServer.version());
+        assertEquals(-1, track(MatchingEngineServer.launch(baseConfig("nohttp").build())).httpPort());
+
+        // an occupied port fails the launch and releases everything
+        final int port = server.httpPort();
+        assertThrows(java.io.UncheckedIOException.class,
+            () -> MatchingEngineServer.launch(baseConfig("clash").httpPort(port).build()));
+        server.close();
+        assertFalse(server.isHealthy());
+    }
+
+    @Test
     void mainRunsUntilSignalled() throws Exception
     {
         final EngineConfig config = baseConfig("main").build();

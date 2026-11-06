@@ -1,0 +1,16 @@
+# Dev overlay: adds the demo trader to the engine pod (shares the media driver over IPC).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+configMapGenerator:
+  - name: matching-engine-config
+    behavior: merge
+    files:
+      - demo-ipc.properties
+patches:
+  - path: demo-trader-patch.yaml
+images:
+  - name: flash-exchange
+    newName: ghcr.io/syucel1/flash-exchange
+    newTag: main

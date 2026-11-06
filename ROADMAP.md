@@ -1,6 +1,6 @@
 # FlashEx Roadmap
 
-Status: **v1.0 draft** · Updated: 2026-11-04 · Scope: full spot FX exchange as specified in [`docs/`](docs/README.md)
+Status: **v1.1** · Updated: 2026-11-06 · Scope: full spot FX exchange as specified in [`docs/`](docs/README.md)
 
 The design describes a complete exchange: matching engine, trading service, web platform, identity, funding,
 history, observability and high availability. So far only the **matching engine and its Aeron integration** exist.
@@ -16,7 +16,8 @@ working and testable.
 | Disruptor pipeline, Aeron IPC / reliable UDP, L2 market data, snapshots | ✅ Done |
 | Protocol module (binary flyweights), engine client | ✅ Done |
 | Tests: 126 unit + integration, 99.9 % line coverage | ✅ Done |
-| Everything else in this document | ⏳ Planned |
+| **Phase 1:** Maven wrapper, quality gates, JMH module, container image, docker-compose (IPC + UDP), CI/CD, K8s manifests | ✅ Done |
+| Phases 2–13 | ⏳ Planned (next: **Phase 2 engine durability and HA**, Phase 3 metrics) |
 
 ## Phase overview
 
@@ -64,7 +65,7 @@ gantt
 
 ---
 
-## Phase 1: Delivery foundations (CI/CD and containerisation)
+## Phase 1: Delivery foundations (CI/CD and containerisation) ✅
 
 **Goal:** every component builds, tests and ships as a container image from a pipeline. A developer can start the
 whole stack with one command.
@@ -81,6 +82,17 @@ whole stack with one command.
 - **Versioning and releases:** semantic versions, changelog, image tags tied to git SHAs.
 
 **Exit criteria:** `docker compose up` runs the engine with a demo client; every merge to `main` produces tested images.
+
+**Delivered (2026-11-06):**
+- Maven Wrapper; Checkstyle, SpotBugs, JaCoCo and optional OWASP gates; `.editorconfig` / `.gitattributes`.
+- `matching-engine-bench` (JMH).
+- Engine `/health` and `/status` endpoint; `DemoTrader` load generator.
+- A single non-root image with roles `media-driver | matching-engine | demo-trader`.
+- `docker-compose.yml` with an IPC stack and a `udp` profile; compose smoke test.
+- Workflows: CI (tests → image → Trivy → smoke → GHCR), release, nightly benchmarks, CodeQL; Dependabot.
+- Kustomize manifests with the media driver as a native sidecar.
+
+See `DEVELOPMENT.md` and `CHANGELOG.md`.
 
 ## Phase 2: Engine durability and high availability
 

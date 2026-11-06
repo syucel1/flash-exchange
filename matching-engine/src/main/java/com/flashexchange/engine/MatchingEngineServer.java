@@ -2,6 +2,7 @@ package com.flashexchange.engine;
 
 import com.flashexchange.engine.config.EngineConfig;
 import com.flashexchange.engine.matching.Instrument;
+import com.flashexchange.engine.ops.EngineHttpServer;
 import com.flashexchange.engine.pipeline.EnginePipeline;
 import com.flashexchange.engine.pipeline.OfferingMessagePublisher;
 import com.flashexchange.engine.pipeline.OrderCommand;
@@ -14,6 +15,9 @@ import org.agrona.concurrent.BackoffIdleStrategy;
 import org.agrona.concurrent.SystemEpochNanoClock;
 import org.agrona.concurrent.SystemNanoClock;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -37,6 +41,8 @@ public final class MatchingEngineServer implements AutoCloseable
     private final CommandIngress ingress;
     private final AgentRunner ingressRunner;
     private final AtomicLong ingressErrors = new AtomicLong();
+    private final EngineHttpServer httpServer;
+    private final long startTimeMs = System.currentTimeMillis();
     private volatile boolean closed;
 
     private MatchingEngineServer(final EngineConfig config, final AeronTransport transport)
@@ -74,6 +80,91 @@ public final class MatchingEngineServer implements AutoCloseable
         this.ingressRunner = new AgentRunner(
             config.ingressIdleStrategy().create(), this::onIngressError, null, ingress);
         AgentRunner.startOnThread(ingressRunner);
+
+        EngineHttpServer http = null;
+        try
+        {
+            if (config.httpPort() >= 0)
+            {
+                http = new EngineHttpServer(config.httpHost(), config.httpPort(), this::isHealthy, this::status);
+            }
+        }
+        catch (final RuntimeException ex)
+        {
+            CloseHelper.quietCloseAll(ingressRunner, pipeline);
+            throw ex;
+        }
+        this.httpServer = http;
+    }
+
+    /**
+     * Liveness: not closed, ingress agent running and Aeron client open.
+     *
+     * @return true when the engine can process commands.
+     */
+    public boolean isHealthy()
+    {
+        return !closed && !ingressRunner.isClosed() && !transport.aeron().isClosed();
+    }
+
+    /**
+     * Operational status document (configuration and counters), as served on {@code /status}.
+     *
+     * @return status map.
+     */
+    public Map<String, Object> status()
+    {
+        final Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", isHealthy() ? "UP" : "DOWN");
+        status.put("version", version());
+        status.put("uptimeMs", System.currentTimeMillis() - startTimeMs);
+        status.put("transport", config.transportMode().name());
+        status.put("aeronDirectory", aeronDirectoryName());
+        status.put("commandChannel", config.channels().commandChannel());
+        status.put("executionChannel", config.channels().executionChannel());
+        status.put("marketDataChannel", config.channels().marketDataChannel());
+        status.put("matcherShards", config.matcherShards());
+        status.put("instruments", config.instruments().stream().map(Instrument::symbol).toList());
+        status.put("commandsReceived", ingress.commandsReceived());
+        status.put("malformedMessages", ingress.malformedMessages());
+        status.put("snapshotsScheduled", ingress.snapshotsScheduled());
+        status.put("lastPublishedSequence", pipeline.lastPublishedSequence());
+        status.put("eventExceptions", pipeline.eventExceptions());
+        status.put("ingressErrors", ingressErrors.get());
+        status.put("publishers", List.of(publisherStatus(executionPublisher), publisherStatus(marketDataPublisher)));
+        return status;
+    }
+
+    private static Map<String, Object> publisherStatus(final OfferingMessagePublisher publisher)
+    {
+        final Map<String, Object> status = new LinkedHashMap<>();
+        status.put("name", publisher.name());
+        status.put("published", publisher.published());
+        status.put("droppedNotConnected", publisher.droppedNotConnected());
+        status.put("droppedBackPressured", publisher.droppedBackPressured());
+        status.put("failed", publisher.failed());
+        return status;
+    }
+
+    /**
+     * Implementation version from the jar manifest, or {@code dev} when running from classes.
+     *
+     * @return version string.
+     */
+    public static String version()
+    {
+        final String version = MatchingEngineServer.class.getPackage().getImplementationVersion();
+        return version == null ? "dev" : version;
+    }
+
+    /**
+     * Port of the operational HTTP endpoint.
+     *
+     * @return bound port, or -1 when disabled.
+     */
+    public int httpPort()
+    {
+        return httpServer == null ? -1 : httpServer.port();
     }
 
     /**
@@ -195,7 +286,7 @@ public final class MatchingEngineServer implements AutoCloseable
             return;
         }
         closed = true;
-        CloseHelper.closeAll(ingressRunner, pipeline, transport);
+        CloseHelper.closeAll(httpServer, ingressRunner, pipeline, transport);
         LOGGER.log(System.Logger.Level.INFO, "matching engine stopped: " + executionPublisher + " " +
             marketDataPublisher);
     }

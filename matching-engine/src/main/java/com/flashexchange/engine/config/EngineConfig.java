@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -40,6 +41,8 @@ public final class EngineConfig
     private final int snapshotDepth;
     private final long publishRetryTimeoutMs;
     private final long shutdownTimeoutMs;
+    private final String httpHost;
+    private final int httpPort;
 
     private EngineConfig(final Builder b)
     {
@@ -61,6 +64,8 @@ public final class EngineConfig
         this.snapshotDepth = b.snapshotDepth;
         this.publishRetryTimeoutMs = b.publishRetryTimeoutMs;
         this.shutdownTimeoutMs = b.shutdownTimeoutMs;
+        this.httpHost = Objects.requireNonNull(b.httpHost, "httpHost");
+        this.httpPort = b.httpPort;
         validate();
     }
 
@@ -97,6 +102,11 @@ public final class EngineConfig
         if (snapshotIntervalMs < 0 || snapshotDepth < 0 || publishRetryTimeoutMs < 0 || shutdownTimeoutMs < 0)
         {
             throw new IllegalArgumentException("intervals, depths and timeouts must be >= 0");
+        }
+        if (httpPort < -1 || httpPort > 65535)
+        {
+            throw new IllegalArgumentException(
+                "httpPort must be -1 (disabled), 0 (ephemeral) or a port: " + httpPort);
         }
         if (termLength != 0 && (termLength < 65536 || Integer.bitCount(termLength) != 1))
         {
@@ -150,7 +160,7 @@ public final class EngineConfig
     public static EngineConfig fromProperties(final Properties p)
     {
         final Builder b = builder();
-        b.transportMode(TransportMode.valueOf(get(p, "transport", b.transportMode.name()).toUpperCase()));
+        b.transportMode(TransportMode.valueOf(get(p, "transport", b.transportMode.name()).toUpperCase(Locale.ROOT)));
         b.udpHost(get(p, "udp.host", b.udpHost));
         b.udpCommandPort(Integer.parseInt(get(p, "udp.commandPort", String.valueOf(b.udpCommandPort))));
         b.udpExecutionControlPort(Integer.parseInt(
@@ -177,15 +187,16 @@ public final class EngineConfig
         b.embeddedMediaDriver(Boolean.parseBoolean(
             get(p, "aeron.embeddedMediaDriver", String.valueOf(b.embeddedMediaDriver))));
         b.driverThreadingMode(ThreadingMode.valueOf(
-            get(p, "aeron.driverThreadingMode", b.driverThreadingMode.name()).toUpperCase()));
+            get(p, "aeron.driverThreadingMode", b.driverThreadingMode.name()).toUpperCase(Locale.ROOT)));
         b.deleteAeronDirectoryOnStart(Boolean.parseBoolean(
             get(p, "aeron.deleteDirOnStart", String.valueOf(b.deleteAeronDirectoryOnStart))));
         b.termLength(Integer.parseInt(get(p, "aeron.termLength", String.valueOf(b.termLength))));
 
         b.ringBufferSize(Integer.parseInt(get(p, "ringBufferSize", String.valueOf(b.ringBufferSize))));
-        b.waitStrategy(WaitStrategyType.valueOf(get(p, "waitStrategy", b.waitStrategy.name()).toUpperCase()));
+        b.waitStrategy(WaitStrategyType.valueOf(
+            get(p, "waitStrategy", b.waitStrategy.name()).toUpperCase(Locale.ROOT)));
         b.ingressIdleStrategy(IdleStrategyType.valueOf(
-            get(p, "ingressIdleStrategy", b.ingressIdleStrategy.name()).toUpperCase()));
+            get(p, "ingressIdleStrategy", b.ingressIdleStrategy.name()).toUpperCase(Locale.ROOT)));
         b.matcherShards(Integer.parseInt(get(p, "matcherShards", String.valueOf(b.matcherShards))));
         b.fragmentLimit(Integer.parseInt(get(p, "fragmentLimit", String.valueOf(b.fragmentLimit))));
         b.orderPoolSize(Integer.parseInt(get(p, "orderPoolSize", String.valueOf(b.orderPoolSize))));
@@ -194,6 +205,8 @@ public final class EngineConfig
         b.publishRetryTimeoutMs(Long.parseLong(
             get(p, "publish.retryTimeoutMs", String.valueOf(b.publishRetryTimeoutMs))));
         b.shutdownTimeoutMs(Long.parseLong(get(p, "shutdownTimeoutMs", String.valueOf(b.shutdownTimeoutMs))));
+        b.httpHost(get(p, "http.host", b.httpHost));
+        b.httpPort(Integer.parseInt(get(p, "http.port", String.valueOf(b.httpPort))));
 
         final String instruments = p.getProperty(PREFIX + "instruments");
         if (instruments != null)
@@ -423,13 +436,33 @@ public final class EngineConfig
         return shutdownTimeoutMs;
     }
 
+    /**
+     * Bind address of the operational HTTP endpoint.
+     *
+     * @return host.
+     */
+    public String httpHost()
+    {
+        return httpHost;
+    }
+
+    /**
+     * Port of the operational HTTP endpoint (-1 = disabled, 0 = ephemeral).
+     *
+     * @return port.
+     */
+    public int httpPort()
+    {
+        return httpPort;
+    }
+
     @Override
     public String toString()
     {
         return "EngineConfig{transport=" + transportMode + ", channels=" + channels + ", aeronDirectory=" +
             aeronDirectory + ", embeddedMediaDriver=" + embeddedMediaDriver + ", driverThreadingMode=" +
             driverThreadingMode + ", instruments=" + instruments.size() + ", ringBufferSize=" + ringBufferSize +
-            ", waitStrategy=" + waitStrategy + ", matcherShards=" + matcherShards + "}";
+            ", waitStrategy=" + waitStrategy + ", matcherShards=" + matcherShards + ", httpPort=" + httpPort + "}";
     }
 
     /**
@@ -459,6 +492,8 @@ public final class EngineConfig
         private int snapshotDepth;
         private long publishRetryTimeoutMs = 1000;
         private long shutdownTimeoutMs = 5000;
+        private String httpHost = "0.0.0.0";
+        private int httpPort = -1;
 
         private Builder()
         {
@@ -737,6 +772,30 @@ public final class EngineConfig
         public Builder shutdownTimeoutMs(final long value)
         {
             shutdownTimeoutMs = value;
+            return this;
+        }
+
+        /**
+         * Bind address of the operational HTTP endpoint.
+         *
+         * @param value host.
+         * @return this.
+         */
+        public Builder httpHost(final String value)
+        {
+            httpHost = value;
+            return this;
+        }
+
+        /**
+         * Port of the operational HTTP endpoint (-1 = disabled, 0 = ephemeral).
+         *
+         * @param value port.
+         * @return this.
+         */
+        public Builder httpPort(final int value)
+        {
+            httpPort = value;
             return this;
         }
 

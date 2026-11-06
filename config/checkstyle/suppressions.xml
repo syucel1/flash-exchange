@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<suppressions>
+    <!-- tests: no Javadoc or final-parameter requirements, multiple asserts on one line allowed -->
+    <suppress files="[\\/]src[\\/]test[\\/]" checks="MissingJavadoc.*|JavadocMethod|JavadocStyle|FinalParameters|FinalClass|HideUtilityClassConstructor"/>
+    <!-- benchmarks: JMH generates subclasses of @State classes -->
+    <suppress files="[\\/]matching-engine-bench[\\/]" checks="MissingJavadoc.*|JavadocMethod|FinalClass"/>
+</suppressions>
