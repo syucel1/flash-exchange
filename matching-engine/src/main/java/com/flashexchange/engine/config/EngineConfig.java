@@ -43,6 +43,8 @@ public final class EngineConfig
     private final long shutdownTimeoutMs;
     private final String httpHost;
     private final int httpPort;
+    private final DurabilityConfig durability;
+    private final HaConfig ha;
 
     private EngineConfig(final Builder b)
     {
@@ -66,6 +68,8 @@ public final class EngineConfig
         this.shutdownTimeoutMs = b.shutdownTimeoutMs;
         this.httpHost = Objects.requireNonNull(b.httpHost, "httpHost");
         this.httpPort = b.httpPort;
+        this.durability = Objects.requireNonNull(b.durability, "durability");
+        this.ha = Objects.requireNonNull(b.ha, "ha");
         validate();
     }
 
@@ -107,6 +111,10 @@ public final class EngineConfig
         {
             throw new IllegalArgumentException(
                 "httpPort must be -1 (disabled), 0 (ephemeral) or a port: " + httpPort);
+        }
+        if (ha.enabled() && (!durability.journalEnabled() || durability.archiveControlPort() == 0))
+        {
+            throw new IllegalArgumentException("HA requires the journal and a remote archive control port");
         }
         if (termLength != 0 && (termLength < 65536 || Integer.bitCount(termLength) != 1))
         {
@@ -207,6 +215,9 @@ public final class EngineConfig
         b.shutdownTimeoutMs(Long.parseLong(get(p, "shutdownTimeoutMs", String.valueOf(b.shutdownTimeoutMs))));
         b.httpHost(get(p, "http.host", b.httpHost));
         b.httpPort(Integer.parseInt(get(p, "http.port", String.valueOf(b.httpPort))));
+
+        b.durability(DurabilityConfig.fromProperties(p, PREFIX));
+        b.ha(HaConfig.fromProperties(p, PREFIX));
 
         final String instruments = p.getProperty(PREFIX + "instruments");
         if (instruments != null)
@@ -456,13 +467,34 @@ public final class EngineConfig
         return httpPort;
     }
 
+    /**
+     * Journal, snapshot and archive settings.
+     *
+     * @return durability configuration.
+     */
+    public DurabilityConfig durability()
+    {
+        return durability;
+    }
+
+    /**
+     * Primary/standby settings.
+     *
+     * @return HA configuration.
+     */
+    public HaConfig ha()
+    {
+        return ha;
+    }
+
     @Override
     public String toString()
     {
         return "EngineConfig{transport=" + transportMode + ", channels=" + channels + ", aeronDirectory=" +
             aeronDirectory + ", embeddedMediaDriver=" + embeddedMediaDriver + ", driverThreadingMode=" +
             driverThreadingMode + ", instruments=" + instruments.size() + ", ringBufferSize=" + ringBufferSize +
-            ", waitStrategy=" + waitStrategy + ", matcherShards=" + matcherShards + ", httpPort=" + httpPort + "}";
+            ", waitStrategy=" + waitStrategy + ", matcherShards=" + matcherShards + ", httpPort=" + httpPort +
+            ", durability=" + durability + ", ha=" + ha + "}";
     }
 
     /**
@@ -494,6 +526,8 @@ public final class EngineConfig
         private long shutdownTimeoutMs = 5000;
         private String httpHost = "0.0.0.0";
         private int httpPort = -1;
+        private DurabilityConfig durability = DurabilityConfig.disabled();
+        private HaConfig ha = HaConfig.disabled();
 
         private Builder()
         {
@@ -796,6 +830,30 @@ public final class EngineConfig
         public Builder httpPort(final int value)
         {
             httpPort = value;
+            return this;
+        }
+
+        /**
+         * Journal, snapshot and archive settings.
+         *
+         * @param value durability configuration.
+         * @return this.
+         */
+        public Builder durability(final DurabilityConfig value)
+        {
+            durability = value;
+            return this;
+        }
+
+        /**
+         * Primary/standby settings.
+         *
+         * @param value HA configuration.
+         * @return this.
+         */
+        public Builder ha(final HaConfig value)
+        {
+            ha = value;
             return this;
         }
 

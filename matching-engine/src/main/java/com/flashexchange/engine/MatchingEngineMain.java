@@ -18,15 +18,20 @@ public final class MatchingEngineMain
     {
     }
 
+    /** Exit status of a node fenced by the arbiter; the supervisor restarts it and it rejoins as standby. */
+    public static final int EXIT_FENCED = 3;
+
     /**
-     * Run the engine until the barrier is signalled.
+     * Run the engine until the barrier is signalled or the node is fenced.
      *
      * @param config  configuration.
      * @param barrier signalled on shutdown.
+     * @return true if the engine stopped because it was fenced.
      */
-    public static void run(final EngineConfig config, final ShutdownSignalBarrier barrier)
+    public static boolean run(final EngineConfig config, final ShutdownSignalBarrier barrier)
     {
         final MatchingEngineServer server = MatchingEngineServer.launch(config);
+        server.onFenced(barrier::signal);
         try
         {
             barrier.await();
@@ -35,6 +40,7 @@ public final class MatchingEngineMain
         {
             server.close();
         }
+        return server.conductor().isFenced();
     }
 
     /**
@@ -46,6 +52,9 @@ public final class MatchingEngineMain
     public static void main(final String[] args) throws Exception
     {
         final EngineConfig config = EngineConfig.load(args.length > 0 ? Path.of(args[0]) : null);
-        run(config, new ShutdownSignalBarrier());
+        if (run(config, new ShutdownSignalBarrier()))
+        {
+            System.exit(EXIT_FENCED);
+        }
     }
 }

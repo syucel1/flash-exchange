@@ -16,6 +16,7 @@ Flash Exchange is a spot currency exchange. Registered users fund their accounts
 | 6 | [Accounts, Funding & Data](docs/06-accounts-funding-data.md) | Ledger, deposits, balances/holds, PostgreSQL schema, persistence pipeline |
 | 7 | [Interactions](docs/07-interactions.md) | Sequence diagrams for every key flow, order state machine |
 | 8 | [NFRs, Operations & Roadmap](docs/08-nfr-ops-roadmap.md) | Latency/throughput targets, HA, security, observability, testing, delivery plan |
+| 10 | [Durability & HA (implemented)](docs/10-durability-ha.md) | Journal, snapshots, recovery, primary/standby, arbiter, fencing, client de-duplication, schema versioning, rolling upgrades |
 
 **Roadmap:** [ROADMAP.md](ROADMAP.md) / [ROADMAP.html](ROADMAP.html), with UI mockups in [`mockups/`](mockups/).
 
@@ -28,7 +29,7 @@ Architecture diagrams are Graphviz (sources in `docs/diagrams/*.dot`, rendered t
 | Module / folder | Contents |
 |---|---|
 | [`protocol/`](protocol) | Binary message flyweights shared by the engine and its clients |
-| [`matching-engine/`](matching-engine) | Matching engine, Disruptor pipeline, Aeron IPC / UDP transport, HTTP status endpoint, demo trader ([README](matching-engine/README.md)) |
+| [`matching-engine/`](matching-engine) | Matching engine, Disruptor pipeline, Aeron IPC / UDP transport, journal and snapshots on Aeron Archive, primary/standby HA with an arbiter, HTTP status endpoint, demo trader ([README](matching-engine/README.md)) |
 | [`matching-engine-bench/`](matching-engine-bench) | JMH benchmarks |
 | [`docker/`](docker), [`docker-compose.yml`](docker-compose.yml) | Container image and local stack |
 | [`deploy/k8s/`](deploy/k8s) | Kubernetes (Kustomize) manifests |
@@ -40,6 +41,7 @@ Quick start (JDK 21 and Docker; no Maven install needed):
 ./mvnw verify                      # build, tests, quality gates
 docker compose up --build          # media driver + matching engine + demo trader
 curl localhost:8080/status
+docker compose --profile ha up -d  # HA pair + arbiter; then: bash scripts/ha-failover-smoke-test.sh
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full developer guide and [CHANGELOG.md](CHANGELOG.md) for changes.

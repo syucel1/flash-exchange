@@ -12,6 +12,7 @@ import com.lmax.disruptor.dsl.ProducerType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,9 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * The engine's internal event-processing pipeline, built on the LMAX Disruptor:
  * <pre>
- *   ingress (single producer) ──▶ [ ring of OrderCommand ] ──▶ matcher shard 0 ┐
- *                                                          ──▶ matcher shard 1 ┼──▶ publisher ──▶ Aeron 2001 / 3001
- *                                                          ──▶ matcher shard N ┘
+ *   conductor (single producer) ──▶ [ ring ] ──▶ matcher shard 0 ┐
+ *                                                ──▶ matcher shard N ┼──▶ publisher (release gate) ──▶ 2001 / 3001
+ *                                                ──▶ journal (100)   ┘
  * </pre>
  * Matcher shards run in parallel on their own threads, each owning a disjoint set of instruments. The publisher
  * runs strictly after all matchers for a given slot and handles slots in sequence order, so output order is
@@ -34,6 +35,7 @@ public final class EnginePipeline implements AutoCloseable
     private final PublisherEventHandler publisherHandler;
     private final CountingExceptionHandler exceptionHandler = new CountingExceptionHandler();
     private final long shutdownTimeoutMs;
+    private final NamedThreadFactory threadFactory = new NamedThreadFactory();
     private RingBuffer<OrderCommand> ringBuffer;
     private boolean closed;
 
@@ -62,18 +64,53 @@ public final class EnginePipeline implements AutoCloseable
         final MessagePublisher marketDataPublisher,
         final long shutdownTimeoutMs)
     {
+        this(instruments, shardCount, ringBufferSize, waitStrategy, orderPoolSize, snapshotDepth, executionPublisher,
+            marketDataPublisher, shutdownTimeoutMs, null, null, 0);
+    }
+
+    /**
+     * Build (but do not start) a pipeline with durability stages.
+     *
+     * @param instruments         all instruments.
+     * @param shardCount          number of matcher threads.
+     * @param ringBufferSize      ring size (power of two).
+     * @param waitStrategy        Disruptor wait strategy for the consumers.
+     * @param orderPoolSize       pre-allocated orders per shard.
+     * @param snapshotDepth       levels per side in snapshots (0 = full depth).
+     * @param executionPublisher  destination of private events.
+     * @param marketDataPublisher destination of market data.
+     * @param shutdownTimeoutMs   how long {@link #close()} waits for in-flight commands to drain.
+     * @param journalStage        stage journaling commands in parallel with the matchers, or {@code null}.
+     * @param releaseControl      release gate of the publisher, or {@code null}.
+     * @param nodeId              node id announced in role messages.
+     */
+    public EnginePipeline(
+        final Collection<Instrument> instruments,
+        final int shardCount,
+        final int ringBufferSize,
+        final WaitStrategy waitStrategy,
+        final int orderPoolSize,
+        final int snapshotDepth,
+        final MessagePublisher executionPublisher,
+        final MessagePublisher marketDataPublisher,
+        final long shutdownTimeoutMs,
+        final EventHandler<OrderCommand> journalStage,
+        final ReleaseControl releaseControl,
+        final int nodeId)
+    {
         if (shardCount < 1)
         {
             throw new IllegalArgumentException("shardCount must be >= 1: " + shardCount);
         }
         this.shutdownTimeoutMs = shutdownTimeoutMs;
         this.disruptor = new Disruptor<>(
-            OrderCommand::new, ringBufferSize, new NamedThreadFactory(), ProducerType.SINGLE, waitStrategy);
+            OrderCommand::new, ringBufferSize, threadFactory, ProducerType.SINGLE, waitStrategy);
         this.disruptor.setDefaultExceptionHandler(exceptionHandler);
 
         this.engines = new MatchingEngine[shardCount];
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        final EventHandler<OrderCommand>[] matchers = new EventHandler[shardCount];
+        final EventHandler<OrderCommand>[] matchers =
+            new EventHandler[journalStage == null ? shardCount : shardCount + 1];
         for (int shard = 0; shard < shardCount; shard++)
         {
             final List<Instrument> shardInstruments = new ArrayList<>();
@@ -89,7 +126,12 @@ public final class EnginePipeline implements AutoCloseable
             matchers[shard] = new MatcherEventHandler(shard, shardCount, engines[shard], sink);
         }
 
-        this.publisherHandler = new PublisherEventHandler(executionPublisher, marketDataPublisher);
+        if (journalStage != null)
+        {
+            matchers[shardCount] = journalStage;
+        }
+        this.publisherHandler =
+            new PublisherEventHandler(executionPublisher, marketDataPublisher, releaseControl, nodeId);
         disruptor.handleEventsWith(matchers).then(publisherHandler);
     }
 
@@ -146,6 +188,16 @@ public final class EnginePipeline implements AutoCloseable
     }
 
     /**
+     * Publisher stage (release state and counters).
+     *
+     * @return publisher.
+     */
+    public PublisherEventHandler publisher()
+    {
+        return publisherHandler;
+    }
+
+    /**
      * Commands whose processing threw an exception.
      *
      * @return count.
@@ -180,15 +232,57 @@ public final class EnginePipeline implements AutoCloseable
         }
     }
 
+    /**
+     * Stop the consumer threads immediately without draining (crash simulation and fatal errors). Idempotent.
+     */
+    public void halt()
+    {
+        if (closed)
+        {
+            return;
+        }
+        closed = true;
+        if (ringBuffer != null)
+        {
+            disruptor.halt();
+            // the stages must have stopped before the caller releases the Aeron resources they use
+            threadFactory.join(shutdownTimeoutMs);
+        }
+    }
+
     private static final class NamedThreadFactory implements ThreadFactory
     {
         private final AtomicInteger counter = new AtomicInteger();
+        private final List<Thread> threads = new CopyOnWriteArrayList<>();
+
+        void join(final long timeoutMs)
+        {
+            final long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            for (final Thread thread : threads)
+            {
+                final long remainingMs = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                if (remainingMs <= 0)
+                {
+                    return;
+                }
+                try
+                {
+                    thread.join(remainingMs);
+                }
+                catch (final InterruptedException ex)
+                {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
 
         @Override
         public Thread newThread(final Runnable runnable)
         {
             final Thread thread = new Thread(runnable, "engine-pipeline-" + counter.getAndIncrement());
             thread.setDaemon(true);
+            threads.add(thread);
             return thread;
         }
     }

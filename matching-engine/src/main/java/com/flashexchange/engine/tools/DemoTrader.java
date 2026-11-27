@@ -248,7 +248,7 @@ public final class DemoTrader implements AutoCloseable, EngineEventListener
                 ctx.aeronDirectoryName(directory);
             }
             connected = Aeron.connect(ctx);
-            this.client = new EngineClient(connected, config.channels(), 1_000);
+            this.client = new EngineClient(connected, config.engines(), 1_000);
         }
         catch (final RuntimeException ex)
         {

@@ -13,6 +13,7 @@ public final class EngineMessageDispatcher
     private final BookUpdateFlyweight bookUpdate = new BookUpdateFlyweight();
     private final BookSnapshotFlyweight bookSnapshot = new BookSnapshotFlyweight();
     private final PublicTradeFlyweight publicTrade = new PublicTradeFlyweight();
+    private final EngineRoleFlyweight engineRole = new EngineRoleFlyweight();
 
     /**
      * Decode one message.
@@ -71,6 +72,14 @@ public final class EngineMessageDispatcher
                 if (MessageHeader.isValid(buffer, offset, length, PublicTradeFlyweight.BLOCK_LENGTH))
                 {
                     listener.onPublicTrade(publicTrade.wrapForDecode(buffer, offset));
+                    return templateId;
+                }
+                break;
+
+            case EngineRoleFlyweight.TEMPLATE_ID:
+                if (MessageHeader.isValid(buffer, offset, length, EngineRoleFlyweight.BLOCK_LENGTH))
+                {
+                    listener.onEngineRole(engineRole.wrapForDecode(buffer, offset));
                     return templateId;
                 }
                 break;

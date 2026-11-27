@@ -38,13 +38,14 @@ ul{padding-left:20px}li{margin:3px 0}hr{display:none}
 @media print{.side,.tbtn{display:none}main{margin:0;max-width:none}.card{break-inside:avoid-page}.hero{print-color-adjust:exact;-webkit-print-color-adjust:exact}.tl-bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style></head><body>
 <nav class="side"><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M18 5 9 18h6l-2 9 10-14h-6l1-8z" fill="#fff"/></svg><span>Flash<b>Ex</b></span></div>
-<div class="sub">Roadmap · v1.0 · Nov 2026</div><a href="#where-we-are">Where we are</a><a href="#phase-overview">Phase overview</a><a href="#phase-1-delivery-foundations-cicd-and-containerisation">1 · Delivery foundations</a><a href="#phase-2-engine-durability-and-high-availability">2 · Engine durability and high availability</a><a href="#phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">3 · Observability I: comprehensive metrics</a><a href="#phase-4-observability-ii-logging-review-and-log-search-for-the-support-desk-elk-kibana">4 · Observability II: logging review and log search for the support desk</a><a href="#phase-5-engine-admin-and-direct-access">5 · Engine admin and direct access</a><a href="#phase-6-accounts-and-risk-in-the-engine">6 · Accounts and risk in the engine</a><a href="#phase-7-trading-service-and-backend-services-fully-containerised-and-tested">7 · Trading Service and backend services</a><a href="#phase-8-web-trading-platform">8 · Web trading platform</a><a href="#phase-9-advanced-order-types">9 · Advanced order types</a><a href="#phase-10-algorithmic-orders">10 · Algorithmic orders</a><a href="#phase-11-security-compliance-and-market-integrity">11 · Security, compliance and market integrity</a><a href="#phase-12-performance-resilience-and-go-live">12 · Performance, resilience and go-live</a><a href="#phase-13-ecosystem-and-growth-post-launch">13 · Ecosystem and growth</a><a href="#cross-cutting-work-runs-through-every-phase">Cross-cutting work</a><a href="#mockups">Mockups</a><button class="tbtn" onclick="toggleTheme()">Toggle light / dark</button></nav>
+<div class="sub">Roadmap · v1.0 · Nov 2026</div><a href="#where-we-are">Where we are</a><a href="#phase-overview">Phase overview</a><a href="#phase-1-delivery-foundations-cicd-and-containerisation">1 · Delivery foundations</a><a href="#phase-2-engine-durability-and-high-availability">2 · Engine durability and high availability ✅</a><a href="#phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">3 · Observability I: comprehensive metrics</a><a href="#phase-4-observability-ii-logging-review-and-log-search-for-the-support-desk-elk-kibana">4 · Observability II: logging review and log search for the support desk</a><a href="#phase-5-engine-admin-and-direct-access">5 · Engine admin and direct access</a><a href="#phase-6-accounts-and-risk-in-the-engine">6 · Accounts and risk in the engine</a><a href="#phase-7-trading-service-and-backend-services-fully-containerised-and-tested">7 · Trading Service and backend services</a><a href="#phase-8-web-trading-platform">8 · Web trading platform</a><a href="#phase-9-advanced-order-types">9 · Advanced order types</a><a href="#phase-10-algorithmic-orders">10 · Algorithmic orders</a><a href="#phase-11-security-compliance-and-market-integrity">11 · Security, compliance and market integrity</a><a href="#phase-12-performance-resilience-and-go-live">12 · Performance, resilience and go-live</a><a href="#phase-13-ecosystem-and-growth-post-launch">13 · Ecosystem and growth</a><a href="#cross-cutting-work-runs-through-every-phase">Cross-cutting work</a><a href="#mockups">Mockups</a><button class="tbtn" onclick="toggleTheme()">Toggle light / dark</button></nav>
 <main><div class="hero"><h1>FlashEx Roadmap</h1><p>From a working matching engine to a fully scoped spot FX exchange: 13 phases in dependency order, each ending in something working and testable.</p>
 <div class="kpis"><div><b>13</b><span>phases</span></div><div><b>Phase 1 ✓</b><span>engine + delivery foundations done</span></div><div><b>~11 months</b><span>to public launch (indicative)</span></div><div><b>126</b><span>tests · 99.9 % coverage today</span></div></div></div>
 
-<p>Status: <strong>v1.1</strong> · Updated: 2026-11-06 · Scope: full spot FX exchange as specified in <a href="README.md"><code>docs/</code></a></p>
+<p>Status: <strong>v1.2</strong> · Updated: 2026-11-27 · Scope: full spot FX exchange as specified in <a href="README.md"><code>docs/</code></a></p>
 <p>The design describes a complete exchange: matching engine, trading service, web platform, identity, funding,
-history, observability and high availability. So far only the <strong>matching engine and its Aeron integration</strong> exist.
+history, observability and high availability. So far the <strong>matching engine, its Aeron integration, the delivery
+pipeline and engine durability/HA</strong> exist.
 This roadmap orders the remaining work so that each phase builds on the one before it and ends with something
 working and testable.</p>
 <section class="card"><h2 id="where-we-are">Where we are</h2>
@@ -81,8 +82,12 @@ working and testable.</p>
 <td><span class="ok">✅</span> Done</td>
 </tr>
 <tr>
-<td>Phases 2–13</td>
-<td><span class="todo">⏳</span> Planned (next: <strong>Phase 2 engine durability and HA</strong>, Phase 3 metrics)</td>
+<td><strong>Phase 2:</strong> journal + snapshots on Aeron Archive, cold recovery, primary/standby with arbiter, leases and fencing, duplicate <code>clOrdId</code> detection, client de-duplication, HA compose profile and failover drill</td>
+<td><span class="ok">✅</span> Done</td>
+</tr>
+<tr>
+<td>Phases 3–13</td>
+<td><span class="todo">⏳</span> Planned (next: <strong>Phase 3 metrics</strong>, Phase 4 logging and support)</td>
 </tr>
 </tbody>
 </table>
@@ -220,7 +225,7 @@ whole stack with one command.</p>
 - Workflows: CI (tests → image → Trivy → smoke → GHCR), release, nightly benchmarks, CodeQL; Dependabot.
 - Kustomize manifests with the media driver as a native sidecar.</p>
 <p>See <code>DEVELOPMENT.md</code> and <code>CHANGELOG.md</code>.</p>
-</section><section class="card phase"><h2 id="phase-2-engine-durability-and-high-availability">Phase 2: Engine durability and high availability</h2>
+</section><section class="card phase"><h2 id="phase-2-engine-durability-and-high-availability">Phase 2: Engine durability and high availability <span class="ok">✅</span></h2>
 <p><strong>Goal:</strong> no acknowledged order or trade is ever lost, and the engine survives a host failure (design §2.8–2.9).</p>
 <ul>
 <li><strong>Command journal</strong> on Aeron Archive (stream 100); every command is recorded before any of its output is released.</li>
@@ -232,6 +237,22 @@ whole stack with one command.</p>
 <li><strong>Chaos tests:</strong> kill the primary mid-burst, drop packets on the replication link, fill the disk.</li>
 </ul>
 <p><strong>Exit criteria:</strong> primary killed under load, standby promoted in &lt; 1 s, zero lost or duplicated fills (verified by reconciliation).</p>
+<p><strong>Delivered (2026-11-27):</strong>
+- Journal (stream 100) written in parallel with matching, release gate on archive durability; recording extended
+  across restarts.
+- CRC-checked state snapshots (stream 110) on a time/command schedule, at shutdown and after promotion; recovery =
+  newest valid snapshot + journal replay, proven byte-identical (<code>DurabilityIT</code>).
+- Sequencer with a duplicate <code>clOrdId</code> window (journaled flag, rejected as <code>DUPLICATE_CLIENT_ORDER_ID</code>).
+- Standby bootstrap from the primary's snapshot and live journal follow by remote archive replay (101), acks (102),
+  SYNC release with degrade to ASYNC, retained output re-published on promotion.
+- Arbiter with leases, epochs, automatic failover, fencing, re-follow and planned switchover.
+- <code>EngineRole</code> announcements and client-side de-duplication; clients send to both nodes and resend by <code>clOrdId</code>.
+- Chaos and failover tests: primary killed mid-burst (promotion ≈ 550 ms in-process, ≈ 325 ms with
+  <code>docker kill -9</code>), double failover, 10 % packet loss on the standby, standby loss, lease expiry, switchover;
+  reconciliation checks every order answered once, contiguous trade/book sequences, no duplicate reports.
+- Schema versioning rules and the rolling upgrade procedure in <a href="docs/10-durability-ha.md">docs/10-durability-ha.md</a>.
+- Not done: the disk-full chaos case (needs fault injection on the archive volume; moved to phase 12), and HA on
+  Kubernetes (StatefulSet + arbiter; with phase 12).</p>
 </section><section class="card phase"><h2 id="phase-3-observability-i-comprehensive-metrics-prometheus-and-grafana">Phase 3: Observability I: comprehensive metrics (Prometheus and Grafana)</h2>
 <p><strong>Goal:</strong> latency, throughput and health of every component are visible in real time.</p>
 <ul>

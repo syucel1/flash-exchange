@@ -4,6 +4,8 @@ import com.flashexchange.engine.config.EngineChannels;
 import com.flashexchange.protocol.BookSnapshotRequestFlyweight;
 import com.flashexchange.protocol.CancelOrderFlyweight;
 import com.flashexchange.protocol.EngineEventListener;
+import com.flashexchange.protocol.EngineRoleFlyweight;
+import com.flashexchange.protocol.MessageHeader;
 import com.flashexchange.protocol.EngineMessageDispatcher;
 import com.flashexchange.protocol.NewOrderFlyweight;
 import com.flashexchange.protocol.OrderType;
@@ -15,10 +17,13 @@ import io.aeron.FragmentAssembler;
 import io.aeron.Publication;
 import io.aeron.Subscription;
 import org.agrona.CloseHelper;
+import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SleepingMillisIdleStrategy;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,38 +35,121 @@ import java.util.concurrent.TimeUnit;
  */
 public final class EngineClient implements AutoCloseable
 {
+    private static final String MANUAL_MDC = "aeron:udp?control-mode=manual";
+
     private final Publication commandPublication;
-    private final Subscription executionSubscription;
-    private final Subscription marketDataSubscription;
+    private final Subscription[] executionSubscriptions;
+    private final Subscription[] marketDataSubscriptions;
+    private final OutputDeduplicator executionDedup = new OutputDeduplicator();
+    private final OutputDeduplicator marketDataDedup = new OutputDeduplicator();
     private final ExpandableArrayBuffer sendBuffer = new ExpandableArrayBuffer(256);
     private final NewOrderFlyweight newOrder = new NewOrderFlyweight();
     private final CancelOrderFlyweight cancelOrder = new CancelOrderFlyweight();
     private final BookSnapshotRequestFlyweight snapshotRequest = new BookSnapshotRequestFlyweight();
     private final EngineMessageDispatcher dispatcher = new EngineMessageDispatcher();
-    private final FragmentAssembler executionAssembler;
-    private final FragmentAssembler marketDataAssembler;
+    private final FragmentAssembler[] executionAssemblers;
+    private final FragmentAssembler[] marketDataAssemblers;
+    private final long[] executionEpochs;
+    private final long[] marketDataEpochs;
+    private long staleDropped;
     private final long sendTimeoutNs;
     private EngineEventListener listener;
 
     /**
-     * Create publication and subscriptions using client-side channels.
+     * Create a client of one engine.
      *
      * @param aeron         connected Aeron client.
-     * @param channels      client-side channels (see {@link EngineChannels#udpClientSide}) or IPC.
-     * @param sendTimeoutMs how long a send retries on back-pressure before giving up.
+     * @param channels      client-side channels of the engine.
+     * @param sendTimeoutMs how long a send may retry while back-pressured or not connected.
      */
     public EngineClient(final Aeron aeron, final EngineChannels channels, final long sendTimeoutMs)
     {
-        this.commandPublication = aeron.addPublication(channels.commandChannel(), channels.commandStreamId());
-        this.executionSubscription =
-            aeron.addSubscription(channels.executionChannel(), channels.executionStreamId());
-        this.marketDataSubscription =
-            aeron.addSubscription(channels.marketDataChannel(), channels.marketDataStreamId());
+        this(aeron, List.of(channels), sendTimeoutMs);
+    }
+
+    /**
+     * Create a client of an HA engine pair (or any set of engines). Commands go to every engine through one
+     * multi-destination publication: only the primary acts on them, standbys discard them. Output is received from
+     * every engine and de-duplicated across failovers (see {@link OutputDeduplicator}).
+     *
+     * @param aeron         connected Aeron client.
+     * @param engines       client-side channels of each engine; command channels must be UDP for more than one.
+     * @param sendTimeoutMs how long a send may retry while back-pressured or not connected.
+     */
+    public EngineClient(final Aeron aeron, final List<EngineChannels> engines, final long sendTimeoutMs)
+    {
+        if (engines.isEmpty())
+        {
+            throw new IllegalArgumentException("at least one engine is required");
+        }
+        final EngineChannels first = engines.get(0);
+        if (engines.size() == 1)
+        {
+            this.commandPublication = aeron.addPublication(first.commandChannel(), first.commandStreamId());
+        }
+        else
+        {
+            this.commandPublication = aeron.addExclusivePublication(MANUAL_MDC, first.commandStreamId());
+            for (final EngineChannels engine : engines)
+            {
+                commandPublication.addDestination(engine.commandChannel());
+            }
+        }
+        this.executionSubscriptions = new Subscription[engines.size()];
+        this.marketDataSubscriptions = new Subscription[engines.size()];
+        for (int i = 0; i < engines.size(); i++)
+        {
+            final EngineChannels engine = engines.get(i);
+            executionSubscriptions[i] = aeron.addSubscription(engine.executionChannel(), engine.executionStreamId());
+            marketDataSubscriptions[i] =
+                aeron.addSubscription(engine.marketDataChannel(), engine.marketDataStreamId());
+        }
         this.sendTimeoutNs = TimeUnit.MILLISECONDS.toNanos(sendTimeoutMs);
-        this.executionAssembler = new FragmentAssembler(
-            (buffer, offset, length, header) -> dispatcher.dispatch(buffer, offset, length, listener));
-        this.marketDataAssembler = new FragmentAssembler(
-            (buffer, offset, length, header) -> dispatcher.dispatch(buffer, offset, length, listener));
+        this.executionAssemblers = new FragmentAssembler[engines.size()];
+        this.marketDataAssemblers = new FragmentAssembler[engines.size()];
+        this.executionEpochs = new long[engines.size()];
+        this.marketDataEpochs = new long[engines.size()];
+        Arrays.fill(executionEpochs, Long.MIN_VALUE);
+        Arrays.fill(marketDataEpochs, Long.MIN_VALUE);
+        for (int i = 0; i < engines.size(); i++)
+        {
+            final int index = i;
+            executionAssemblers[i] = new FragmentAssembler((buffer, offset, length, header) ->
+                onMessage(buffer, offset, length, index, executionEpochs, executionDedup));
+            marketDataAssemblers[i] = new FragmentAssembler((buffer, offset, length, header) ->
+                onMessage(buffer, offset, length, index, marketDataEpochs, marketDataDedup));
+        }
+    }
+
+    private void onMessage(
+        final DirectBuffer buffer,
+        final int offset,
+        final int length,
+        final int engineIndex,
+        final long[] epochs,
+        final OutputDeduplicator dedup)
+    {
+        if (length >= EngineRoleFlyweight.ENCODED_LENGTH &&
+            MessageHeader.templateId(buffer, offset) == EngineRoleFlyweight.TEMPLATE_ID)
+        {
+            final long epoch = buffer.getLong(offset + MessageHeader.LENGTH, MessageHeader.BYTE_ORDER);
+            epochs[engineIndex] = Math.max(epochs[engineIndex], epoch);
+        }
+        // output of an engine that has been superseded (its epoch is older than the newest announced) is stale
+        long newest = Long.MIN_VALUE;
+        for (final long epoch : epochs)
+        {
+            newest = Math.max(newest, epoch);
+        }
+        if (epochs[engineIndex] < newest)
+        {
+            staleDropped++;
+            return;
+        }
+        if (dedup.accept(buffer, offset, length))
+        {
+            dispatcher.dispatch(buffer, offset, length, listener);
+        }
     }
 
     /**
@@ -71,9 +159,20 @@ public final class EngineClient implements AutoCloseable
      */
     public boolean isConnected()
     {
-        return commandPublication.isConnected() &&
-            executionSubscription.isConnected() &&
-            marketDataSubscription.isConnected();
+        return commandPublication.isConnected() && anyConnected(executionSubscriptions) &&
+            anyConnected(marketDataSubscriptions);
+    }
+
+    private static boolean anyConnected(final Subscription[] subscriptions)
+    {
+        for (final Subscription subscription : subscriptions)
+        {
+            if (subscription.isConnected())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -222,7 +321,12 @@ public final class EngineClient implements AutoCloseable
     public int pollExecutions(final EngineEventListener listener, final int fragmentLimit)
     {
         this.listener = listener;
-        return executionSubscription.poll(executionAssembler, fragmentLimit);
+        int fragments = 0;
+        for (int i = 0; i < executionSubscriptions.length; i++)
+        {
+            fragments += executionSubscriptions[i].poll(executionAssemblers[i], fragmentLimit);
+        }
+        return fragments;
     }
 
     /**
@@ -235,7 +339,12 @@ public final class EngineClient implements AutoCloseable
     public int pollMarketData(final EngineEventListener listener, final int fragmentLimit)
     {
         this.listener = listener;
-        return marketDataSubscription.poll(marketDataAssembler, fragmentLimit);
+        int fragments = 0;
+        for (int i = 0; i < marketDataSubscriptions.length; i++)
+        {
+            fragments += marketDataSubscriptions[i].poll(marketDataAssemblers[i], fragmentLimit);
+        }
+        return fragments;
     }
 
     private boolean offer(final int length)
@@ -269,6 +378,38 @@ public final class EngineClient implements AutoCloseable
     @Override
     public void close()
     {
-        CloseHelper.closeAll(commandPublication, executionSubscription, marketDataSubscription);
+        CloseHelper.closeAll(commandPublication);
+        CloseHelper.closeAll(executionSubscriptions);
+        CloseHelper.closeAll(marketDataSubscriptions);
+    }
+
+    /**
+     * Duplicate filter of the private event stream.
+     *
+     * @return deduplicator.
+     */
+    public OutputDeduplicator executionDeduplicator()
+    {
+        return executionDedup;
+    }
+
+    /**
+     * Duplicate filter of the market data stream.
+     *
+     * @return deduplicator.
+     */
+    public OutputDeduplicator marketDataDeduplicator()
+    {
+        return marketDataDedup;
+    }
+
+    /**
+     * Messages dropped because they came from an engine superseded by a newer epoch.
+     *
+     * @return count.
+     */
+    public long staleDropped()
+    {
+        return staleDropped;
     }
 }

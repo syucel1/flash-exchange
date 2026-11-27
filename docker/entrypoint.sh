@@ -3,7 +3,8 @@
 #   media-driver    [driver.properties ...]   default: config/media-driver.properties
 #   matching-engine [engine.properties]       default: config/engine.properties
 #   demo-trader     [demo.properties]         default: config/demo-ipc.properties
-#   health          probe the engine HTTP endpoint (exit 0 when /health returns 200)
+#   arbiter         [arbiter.properties]      default: config/arbiter.properties
+#   health          probe the engine/arbiter HTTP endpoint (exit 0 when /health returns 200)
 #   driver-health   check that the media driver's CnC file exists
 #   anything else   executed as a command
 set -eu
@@ -28,6 +29,11 @@ case "$ROLE" in
     [ "$#" -eq 0 ] && set -- "$CONFIG_DIR/demo-ipc.properties"
     # shellcheck disable=SC2086
     exec java $JAVA_OPTS -cp "$APP_JAR" com.flashexchange.engine.tools.DemoTrader "$@"
+    ;;
+  arbiter)
+    [ "$#" -eq 0 ] && set -- "$CONFIG_DIR/arbiter.properties"
+    # shellcheck disable=SC2086
+    exec java $JAVA_OPTS -cp "$APP_JAR" com.flashexchange.engine.ha.ArbiterMain "$@"
     ;;
   health)
     PORT="${FLASHEX_HTTP_PORT:-8080}"

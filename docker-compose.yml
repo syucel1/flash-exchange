@@ -3,7 +3,10 @@
 #   ./mvnw -DskipTests package                 # build the application jar
 #   docker compose up --build                  # media driver + matching engine + demo trader over IPC
 #   docker compose --profile udp up --build    # additionally: engine and demo trader on separate "boxes" over UDP
+#   docker compose --profile ha up --build     # additionally: HA pair (engine-a, engine-b) + arbiter + demo trader
 #   curl localhost:8080/status                 # engine status (IPC stack); UDP engine on localhost:8081
+#   curl localhost:8090/status                 # arbiter (HA profile); engine-a on 8091, engine-b on 8092
+#   scripts/ha-failover-smoke-test.sh          # kill -9 the primary and check the standby takes over
 #
 # Later phases add profiles: observability (Prometheus/Grafana, ELK) and full (trading service, web, data stores).
 
@@ -40,6 +43,8 @@ services:
     <<: *flashex
     command: ["matching-engine"]
     ipc: "service:media-driver"
+    volumes:
+      - engine-data:/var/lib/flashex
     depends_on:
       media-driver:
         condition: service_healthy
@@ -71,6 +76,8 @@ services:
     hostname: matching-engine-udp
     command: ["matching-engine", "/opt/flashex/config/engine-udp.properties"]
     shm_size: 512m
+    volumes:
+      - engine-udp-data:/var/lib/flashex
     ports:
       - "8081:8080"
     environment:
@@ -93,3 +100,77 @@ services:
         condition: service_healthy
     environment:
       JAVA_OPTS: "-Xms128m -Xmx128m"
+
+  # ---- high availability: primary/standby pair + arbiter, each on its own "box" -------------------------------
+  arbiter:
+    <<: *flashex
+    profiles: ["ha"]
+    hostname: arbiter
+    command: ["arbiter"]
+    shm_size: 128m
+    ports:
+      - "8090:8080"
+    volumes:
+      - arbiter-data:/var/lib/flashex
+    environment:
+      JAVA_OPTS: "-Xms64m -Xmx64m"
+    healthcheck:
+      test: ["CMD", "/opt/flashex/bin/entrypoint.sh", "health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 12
+
+  engine-a:
+    <<: *flashex
+    profiles: ["ha"]
+    hostname: engine-a
+    command: ["matching-engine", "/opt/flashex/config/engine-ha-a.properties"]
+    shm_size: 512m
+    ports:
+      - "8091:8080"
+    volumes:
+      - engine-a-data:/var/lib/flashex
+    environment:
+      JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx512m"
+    healthcheck: &engine-health
+      test: ["CMD", "/opt/flashex/bin/entrypoint.sh", "health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+
+  engine-b:
+    <<: *flashex
+    profiles: ["ha"]
+    hostname: engine-b
+    command: ["matching-engine", "/opt/flashex/config/engine-ha-b.properties"]
+    shm_size: 512m
+    ports:
+      - "8092:8080"
+    volumes:
+      - engine-b-data:/var/lib/flashex
+    environment:
+      JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx512m"
+    healthcheck: *engine-health
+
+  demo-trader-ha:
+    <<: *flashex
+    profiles: ["ha"]
+    hostname: demo-trader-ha
+    command: ["demo-trader", "/opt/flashex/config/demo-ha.properties"]
+    shm_size: 256m
+    depends_on:
+      engine-a:
+        condition: service_healthy
+      engine-b:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx128m"
+
+volumes:
+  engine-data:
+  engine-udp-data:
+  arbiter-data:
+  engine-a-data:
+  engine-b-data:

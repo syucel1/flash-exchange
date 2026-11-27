@@ -103,10 +103,31 @@ public record DemoTraderConfig(
      */
     public EngineChannels channels()
     {
-        return transport == TransportMode.IPC ?
-            EngineChannels.ipc() :
-            EngineChannels.udpClientSide(
-                engineHost, clientHost, commandPort, executionControlPort, marketDataControlPort);
+        return engines().get(0);
+    }
+
+    /**
+     * Client-side channels of every engine: {@code udp.engineHost} may list several hosts separated by commas (an
+     * HA pair using the same ports), in which case commands go to all of them and output is de-duplicated.
+     *
+     * @return channels per engine.
+     */
+    public List<EngineChannels> engines()
+    {
+        if (transport == TransportMode.IPC)
+        {
+            return List.of(EngineChannels.ipc());
+        }
+        final List<EngineChannels> engines = new ArrayList<>();
+        for (final String host : engineHost.split(","))
+        {
+            if (!host.isBlank())
+            {
+                engines.add(EngineChannels.udpClientSide(
+                    host.trim(), clientHost, commandPort, executionControlPort, marketDataControlPort));
+            }
+        }
+        return engines;
     }
 
     /**
