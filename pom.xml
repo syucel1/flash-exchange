@@ -23,8 +23,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- runtime dependencies -->
-        <agrona.version>2.2.4</agrona.version>
-        <aeron.version>1.48.6</aeron.version>
+        <agrona.version>2.7.0</agrona.version>
+        <aeron.version>1.54.0</aeron.version>
         <disruptor.version>4.0.0</disruptor.version>
 
         <!-- test dependencies -->
