@@ -42,7 +42,7 @@ jobs:
             -jar matching-engine-bench/target/benchmarks.jar ${FILTER:+"$FILTER"} \
             -bm thrpt -tu ms -wi 2 -i 3 -f 1 -rf json -rff jmh-result.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: jmh-result-${{ github.run_number }}
           path: jmh-result.json
