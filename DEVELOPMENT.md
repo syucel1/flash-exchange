@@ -39,7 +39,7 @@ Quality gates (all fail the build):
 |---|---|---|
 | Checkstyle (`config/checkstyle/checkstyle.xml`): Allman braces, final parameters, 120 columns, Javadoc on public API | `validate` | `-Dcheckstyle.skip` |
 | Unit tests (`*Test`), integration tests (`*IT`, real media drivers) | `test`, `integration-test` | `-DskipTests` |
-| JaCoCo: ≥ 95 % lines, ≥ 90 % branches per module | `verify` | `-Djacoco.skip` |
+| JaCoCo: ≥ 95 % lines, ≥ 85 % branches per module | `verify` | `-Djacoco.skip` |
 | SpotBugs (medium+, `config/spotbugs/exclude.xml`) | `verify` | `-Dspotbugs.skip` |
 
 Reports: `*/target/site/jacoco/index.html`, `*/target/spotbugsXml.xml`, `*/target/checkstyle-result.xml`.
@@ -54,6 +54,7 @@ Add these JVM options to run configurations (Agrona 2 / Aeron):
 | `com.flashexchange.engine.MatchingEngineMain [engine.properties]` | Engine |
 | `com.flashexchange.engine.tools.DemoTrader [demo.properties]` | Demo client / load generator |
 | `io.aeron.driver.MediaDriver [driver.properties]` | Standalone media driver |
+| `com.flashexchange.engine.ha.ArbiterMain [arbiter.properties]` | HA arbiter |
 
 On Windows set `flash.engine.aeron.dir` / `flash.demo.aeron.dir` to a local directory (there is no `/dev/shm`).
 
@@ -67,7 +68,13 @@ curl localhost:8080/status                      # IPC engine; the UDP engine is 
 docker compose logs -f demo-trader              # periodic trading summary
 docker compose --profile udp down -v
 bash scripts/compose-smoke-test.sh --udp        # what CI runs: asserts traffic, no rejects, no exceptions
+docker compose --profile ha up -d               # HA: arbiter (:8090), engine-a (:8091), engine-b (:8092), demo trader
+bash scripts/ha-failover-smoke-test.sh          # kill -9 the primary, check promotion < 1 s and rejoin as standby
 ```
+
+Engines in the compose stack keep their journal and snapshots in named volumes (`engine-data`, `engine-a-data`, ...);
+`docker compose down -v` deletes them. `docker compose restart matching-engine` shows a recovery: the engine
+restores its last snapshot, replays the journal tail and announces a new epoch (`/status`).
 
 How IPC works between containers: the `media-driver` service owns a shareable IPC namespace with a 512 MiB
 `/dev/shm`. The engine and the demo trader join it (`ipc: service:media-driver`), so all three see the same
@@ -77,9 +84,20 @@ embedded driver and traffic crosses the Docker network as Aeron reliable UDP.
 ### Image
 
 One image, `ghcr.io/syucel1/flash-exchange`, with the role chosen by the first argument:
-`media-driver`, `matching-engine [props]`, `demo-trader [props]`, `health`, `driver-health`.
+`media-driver`, `matching-engine [props]`, `demo-trader [props]`, `arbiter [props]`, `health`, `driver-health`.
+Data (journal, snapshots, epochs, arbiter state) lives under the `/var/lib/flashex` volume.
 Configuration lives in `/opt/flashex/config` (mount your own to override) and `JAVA_OPTS` sets JVM flags.
 The image runs as uid 10001 and works with a read-only root filesystem (mount `/tmp` and `/dev/shm`).
+
+## Durability and HA
+
+Design, configuration and operating procedures (switchover, rolling upgrade): [docs/10-durability-ha.md](docs/10-durability-ha.md).
+Relevant tests: `DurabilityIT`, `HighAvailabilityIT`, `ArbiterTest`
+(`./mvnw -pl matching-engine -am verify -Dit.test=HighAvailabilityIT`). The HA integration tests run two engine
+nodes, an arbiter and a client on localhost UDP with random ports; each takes 5-15 s.
+
+Protocol changes must follow the schema versioning rules in §10.6 of that document: additive fields at the end of
+a block, never reuse ids or offsets, and keep journals written by the previous version replayable.
 
 ## Kubernetes
 

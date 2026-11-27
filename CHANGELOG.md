@@ -7,6 +7,37 @@ version becomes the GitHub release notes.
 
 ## [Unreleased]
 
+### Added - Roadmap phase 2: engine durability and high availability
+- Command journal on an embedded Aeron Archive (stream 100), written by a Disruptor stage in parallel with the
+  matchers; a release gate holds output until the command is recorded. The journal recording is extended across
+  restarts. (`flash.engine.journal.enabled`, `data.dir`, `archive.*`)
+- State snapshots (stream 110, CRC32-checked) of the sequencer, dedup window and every book, on a time and command
+  count schedule, at shutdown and after promotion; cold recovery from the newest valid snapshot plus journal replay,
+  byte-identical to the uninterrupted run.
+- Sequencer decoupled from the ring sequence; book-snapshot requests no longer consume engine sequences.
+- Duplicate `clientOrderId` detection per user (bounded window, journaled flag): duplicates are rejected with
+  `DUPLICATE_CLIENT_ORDER_ID`, also across restarts and failovers.
+- Primary/standby replication: the standby bootstraps from the primary's snapshot and follows its journal by a
+  remote archive replay of the live recording (stream 101), re-journals and acknowledges (stream 102). SYNC release
+  (output only after the standby's ack, degrades to ASYNC on ack timeout) or ASYNC.
+- Arbiter (`ArbiterMain`, `arbiter` container role): election, leases, automatic failover after primary silence and
+  lease expiry, epochs, fencing of stale primaries, re-follow, planned switchover, persisted state, `/status`.
+- `EngineRole` output message; `EngineClient` talks to an HA pair (commands to every engine, output from all) and
+  de-duplicates output re-published after recovery or failover (`OutputDeduplicator`); `DemoTrader` accepts
+  several engine hosts.
+- New protocol messages: `JournalEntry`, `ReplicationAck`, `NodeHeartbeat`, `ArbiterCommand`, `EngineRole`,
+  `SnapshotBegin/Chunk/End`; reason `DUPLICATE_CLIENT_ORDER_ID`.
+- Docker: data volume `/var/lib/flashex`, journal enabled in the container configs, compose `ha` profile (arbiter,
+  engine-a, engine-b, demo trader) and `scripts/ha-failover-smoke-test.sh` (SIGKILL drill, ~325 ms promotion).
+- Tests: `DurabilityIT`, `HighAvailabilityIT` (exit criterion, double failover, lossy link, lease, switchover),
+  `ArbiterTest` and unit tests for the HA building blocks. Docs: `docs/10-durability-ha.md` (design, ADRs, schema
+  versioning rules, rolling upgrade procedure).
+
+### Changed
+- Engine sequence numbers count only state-changing commands (new orders and cancels).
+- A fenced engine exits with status 3 so its supervisor restarts it as a standby.
+- JaCoCo branch gate lowered from 90 % to 85 % (failure-handling paths of the HA code).
+
 ### Added - Roadmap phase 1: delivery foundations
 - Maven Wrapper (`mvnw`, `mvnw.cmd`; Maven 3.9.9): no local Maven installation needed.
 - Code quality gates in the build: Checkstyle (`config/checkstyle`), SpotBugs (`config/spotbugs`), JaCoCo coverage

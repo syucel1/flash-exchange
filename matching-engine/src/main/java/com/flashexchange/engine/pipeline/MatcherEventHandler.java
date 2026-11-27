@@ -6,7 +6,8 @@ import com.lmax.disruptor.EventHandler;
 /**
  * Disruptor stage that runs one matching shard. Instruments are partitioned across shards by
  * {@code floorMod(instrumentId, shardCount)}; each shard owns its books exclusively, so there is exactly one writer
- * per book and no locking. Commands for other shards are skipped.
+ * per book and no locking. Commands for other shards are skipped. State snapshot commands are handled by every
+ * shard, each serialising its own books into section {@code shard + 1} of the slot.
  */
 public final class MatcherEventHandler implements EventHandler<OrderCommand>
 {
@@ -51,7 +52,13 @@ public final class MatcherEventHandler implements EventHandler<OrderCommand>
     @Override
     public void onEvent(final OrderCommand command, final long sequence, final boolean endOfBatch)
     {
-        if (shardOf(command.instrumentId, shardCount) != shardId)
+        if (command.type == CommandType.STATE_SNAPSHOT)
+        {
+            final int section = shardId + 1;
+            command.sectionLength(section, engine.writeState(command.section(section), 0));
+            return;
+        }
+        if (command.type == CommandType.ROLE_CHANGE || shardOf(command.instrumentId, shardCount) != shardId)
         {
             return;
         }
@@ -60,6 +67,14 @@ public final class MatcherEventHandler implements EventHandler<OrderCommand>
         switch (command.type)
         {
             case NEW_ORDER:
+                if (command.duplicate)
+                {
+                    engine.onDuplicateOrder(
+                        command.engineSequence, command.timestamp, command.orderId, command.clientOrderId,
+                        command.userId, command.instrumentId, command.side, command.orderType, command.timeInForce,
+                        command.price, command.quantity);
+                    break;
+                }
                 engine.onNewOrder(
                     command.engineSequence, command.timestamp, command.orderId, command.clientOrderId,
                     command.userId, command.instrumentId, command.side, command.orderType, command.timeInForce,

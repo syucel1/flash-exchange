@@ -109,6 +109,17 @@ public final class OrderBook
         return ++bookSequence;
     }
 
+    long tradeSequence()
+    {
+        return tradeSequence;
+    }
+
+    void restoreSequences(final long bookSequence, final long tradeSequence)
+    {
+        this.bookSequence = bookSequence;
+        this.tradeSequence = tradeSequence;
+    }
+
     long nextTradeId()
     {
         return ((long)instrument.id() << 40) | ++tradeSequence;

@@ -1,9 +1,10 @@
 # FlashEx Roadmap
 
-Status: **v1.1** · Updated: 2026-11-06 · Scope: full spot FX exchange as specified in [`docs/`](docs/README.md)
+Status: **v1.2** · Updated: 2026-11-27 · Scope: full spot FX exchange as specified in [`docs/`](docs/README.md)
 
 The design describes a complete exchange: matching engine, trading service, web platform, identity, funding,
-history, observability and high availability. So far only the **matching engine and its Aeron integration** exist.
+history, observability and high availability. So far the **matching engine, its Aeron integration, the delivery
+pipeline and engine durability/HA** exist.
 This roadmap orders the remaining work so that each phase builds on the one before it and ends with something
 working and testable.
 
@@ -17,7 +18,8 @@ working and testable.
 | Protocol module (binary flyweights), engine client | ✅ Done |
 | Tests: 126 unit + integration, 99.9 % line coverage | ✅ Done |
 | **Phase 1:** Maven wrapper, quality gates, JMH module, container image, docker-compose (IPC + UDP), CI/CD, K8s manifests | ✅ Done |
-| Phases 2–13 | ⏳ Planned (next: **Phase 2 engine durability and HA**, Phase 3 metrics) |
+| **Phase 2:** journal + snapshots on Aeron Archive, cold recovery, primary/standby with arbiter, leases and fencing, duplicate `clOrdId` detection, client de-duplication, HA compose profile and failover drill | ✅ Done |
+| Phases 3–13 | ⏳ Planned (next: **Phase 3 metrics**, Phase 4 logging and support) |
 
 ## Phase overview
 
@@ -94,7 +96,7 @@ whole stack with one command.
 
 See `DEVELOPMENT.md` and `CHANGELOG.md`.
 
-## Phase 2: Engine durability and high availability
+## Phase 2: Engine durability and high availability ✅
 
 **Goal:** no acknowledged order or trade is ever lost, and the engine survives a host failure (design §2.8–2.9).
 
@@ -107,6 +109,23 @@ See `DEVELOPMENT.md` and `CHANGELOG.md`.
 - **Chaos tests:** kill the primary mid-burst, drop packets on the replication link, fill the disk.
 
 **Exit criteria:** primary killed under load, standby promoted in < 1 s, zero lost or duplicated fills (verified by reconciliation).
+
+**Delivered (2026-11-27):**
+- Journal (stream 100) written in parallel with matching, release gate on archive durability; recording extended
+  across restarts.
+- CRC-checked state snapshots (stream 110) on a time/command schedule, at shutdown and after promotion; recovery =
+  newest valid snapshot + journal replay, proven byte-identical (`DurabilityIT`).
+- Sequencer with a duplicate `clOrdId` window (journaled flag, rejected as `DUPLICATE_CLIENT_ORDER_ID`).
+- Standby bootstrap from the primary's snapshot and live journal follow by remote archive replay (101), acks (102),
+  SYNC release with degrade to ASYNC, retained output re-published on promotion.
+- Arbiter with leases, epochs, automatic failover, fencing, re-follow and planned switchover.
+- `EngineRole` announcements and client-side de-duplication; clients send to both nodes and resend by `clOrdId`.
+- Chaos and failover tests: primary killed mid-burst (promotion ≈ 550 ms in-process, ≈ 325 ms with
+  `docker kill -9`), double failover, 10 % packet loss on the standby, standby loss, lease expiry, switchover;
+  reconciliation checks every order answered once, contiguous trade/book sequences, no duplicate reports.
+- Schema versioning rules and the rolling upgrade procedure in [docs/10-durability-ha.md](docs/10-durability-ha.md).
+- Not done: the disk-full chaos case (needs fault injection on the archive volume; moved to phase 12), and HA on
+  Kubernetes (StatefulSet + arbiter; with phase 12).
 
 ## Phase 3: Observability I: comprehensive metrics (Prometheus and Grafana)
 

@@ -4,6 +4,7 @@ import com.flashexchange.protocol.BookSnapshotFlyweight;
 import com.flashexchange.protocol.BookUpdateFlyweight;
 import com.flashexchange.protocol.EngineEventListener;
 import com.flashexchange.protocol.ExecType;
+import com.flashexchange.protocol.EngineRoleFlyweight;
 import com.flashexchange.protocol.ExecutionReportFlyweight;
 import com.flashexchange.protocol.OrderStatus;
 import com.flashexchange.protocol.PublicTradeFlyweight;
@@ -42,7 +43,14 @@ public final class RecordingListener implements EngineEventListener
     public final List<TradeRecord> publicTrades = new ArrayList<>();
     public final List<Update> updates = new ArrayList<>();
     public final List<SnapshotRecord> snapshots = new ArrayList<>();
+    public final List<long[]> roles = new ArrayList<>();
     public int unknown;
+
+    @Override
+    public void onEngineRole(final EngineRoleFlyweight role)
+    {
+        roles.add(new long[] {role.epoch(), role.roleCode(), role.nodeId(), role.lastSequenceBefore()});
+    }
 
     @Override
     public void onExecutionReport(final ExecutionReportFlyweight r)

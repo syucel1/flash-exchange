@@ -52,6 +52,15 @@ public interface EngineEventListener
     }
 
     /**
+     * A node took over as primary for a new epoch (streams 2001 and 3001).
+     *
+     * @param role decoded flyweight.
+     */
+    default void onEngineRole(final EngineRoleFlyweight role)
+    {
+    }
+
+    /**
      * A message that is not a valid engine output message (wrong schema, too short or unknown template).
      *
      * @param templateId template id from the header, or -1 if the header itself was unreadable.

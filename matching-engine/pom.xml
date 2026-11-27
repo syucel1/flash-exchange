@@ -36,6 +36,11 @@
             <artifactId>aeron-driver</artifactId>
         </dependency>
         <dependency>
+            <!-- command journal, snapshots and replication (Aeron Archive) -->
+            <groupId>io.aeron</groupId>
+            <artifactId>aeron-archive</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.lmax</groupId>
             <artifactId>disruptor</artifactId>
         </dependency>

@@ -8,8 +8,12 @@ import com.flashexchange.protocol.Reason;
 import com.flashexchange.protocol.SelfTradePrevention;
 import com.flashexchange.protocol.Side;
 import com.flashexchange.protocol.TimeInForce;
+import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Objects;
 
@@ -38,8 +42,12 @@ import java.util.Objects;
 public final class MatchingEngine
 {
     private static final long BPS_DIVISOR = 10_000L;
+    private static final ByteOrder STATE_ORDER = ByteOrder.LITTLE_ENDIAN;
+    private static final int STATE_VERSION = 1;
+    private static final int ORDER_STATE_LENGTH = 8 * 8 + 4;
 
     private final Int2ObjectHashMap<OrderBook> books = new Int2ObjectHashMap<>();
+    private final int[] instrumentIds;
     private final ObjectPool<Order> orderPool;
     private final ObjectPool<PriceLevel> levelPool;
     private final EngineEventSink sink;
@@ -75,6 +83,7 @@ public final class MatchingEngine
             }
             books.put(instrument.id(), new OrderBook(instrument, 256));
         }
+        this.instrumentIds = instruments.stream().mapToInt(Instrument::id).sorted().toArray();
     }
 
     /**
@@ -191,6 +200,155 @@ public final class MatchingEngine
         }
 
         publishBookUpdate(engineSequence, timestamp, book);
+    }
+
+    /**
+     * Reject a new order the sequencer identified as a duplicate client order id.
+     *
+     * @param engineSequence  sequence of the command.
+     * @param timestamp       engine timestamp of the command.
+     * @param orderId         id assigned to the order.
+     * @param clientOrderId   client order id.
+     * @param userId          user.
+     * @param instrumentId    instrument.
+     * @param sideCode        side wire code.
+     * @param orderTypeCode   order type wire code.
+     * @param timeInForceCode time in force wire code.
+     * @param price           limit price.
+     * @param quantity        quantity.
+     */
+    public void onDuplicateOrder(
+        final long engineSequence,
+        final long timestamp,
+        final long orderId,
+        final long clientOrderId,
+        final long userId,
+        final int instrumentId,
+        final byte sideCode,
+        final byte orderTypeCode,
+        final byte timeInForceCode,
+        final long price,
+        final long quantity)
+    {
+        sink.onOrderRejected(engineSequence, timestamp, orderId, clientOrderId, userId, instrumentId, sideCode,
+            orderTypeCode, timeInForceCode, price, quantity, Reason.DUPLICATE_CLIENT_ORDER_ID);
+    }
+
+    /**
+     * Serialise the state of every book (resting orders in priority order, book and trade sequences).
+     *
+     * @param buffer destination (an expandable buffer for large books).
+     * @param offset where to write.
+     * @return bytes written.
+     */
+    public int writeState(final MutableDirectBuffer buffer, final int offset)
+    {
+        int pos = offset;
+        buffer.putInt(pos, STATE_VERSION, STATE_ORDER);
+        buffer.putInt(pos + 4, instrumentIds.length, STATE_ORDER);
+        pos += 8;
+        for (final int instrumentId : instrumentIds)
+        {
+            final OrderBook book = books.get(instrumentId);
+            buffer.putInt(pos, instrumentId, STATE_ORDER);
+            buffer.putLong(pos + 4, book.bookSequence(), STATE_ORDER);
+            buffer.putLong(pos + 12, book.tradeSequence(), STATE_ORDER);
+            buffer.putInt(pos + 20, book.orderCount(), STATE_ORDER);
+            pos += 24;
+            for (final BookSide side : new BookSide[] {book.bids(), book.asks()})
+            {
+                for (int depth = 0; depth < side.levelCount(); depth++)
+                {
+                    for (Order o = side.levelAt(depth).head; o != null; o = o.next)
+                    {
+                        pos = writeOrder(buffer, pos, o);
+                    }
+                }
+            }
+        }
+        return pos - offset;
+    }
+
+    private static int writeOrder(final MutableDirectBuffer buffer, final int pos, final Order o)
+    {
+        buffer.putLong(pos, o.orderId, STATE_ORDER);
+        buffer.putLong(pos + 8, o.clientOrderId, STATE_ORDER);
+        buffer.putLong(pos + 16, o.userId, STATE_ORDER);
+        buffer.putLong(pos + 24, o.price, STATE_ORDER);
+        buffer.putLong(pos + 32, o.quantity, STATE_ORDER);
+        buffer.putLong(pos + 40, o.filledQuantity, STATE_ORDER);
+        buffer.putLong(pos + 48, o.timestamp, STATE_ORDER);
+        buffer.putByte(pos + 56, o.side.code());
+        buffer.putByte(pos + 57, o.orderType.code());
+        buffer.putByte(pos + 58, o.timeInForce.code());
+        buffer.putByte(pos + 59, o.selfTradePrevention.code());
+        buffer.putInt(pos + 60, 0, STATE_ORDER);
+        buffer.putInt(pos + 64, 0, STATE_ORDER);
+        return pos + ORDER_STATE_LENGTH;
+    }
+
+    /**
+     * Restore book state written by {@link #writeState(MutableDirectBuffer, int)} into this (empty) engine.
+     *
+     * @param buffer source.
+     * @param offset where the data starts.
+     * @return bytes read.
+     * @throws IllegalStateException if the engine is not empty or the state does not match its instruments.
+     */
+    public int readState(final DirectBuffer buffer, final int offset)
+    {
+        int pos = offset;
+        final int version = buffer.getInt(pos, STATE_ORDER);
+        if (version != STATE_VERSION)
+        {
+            throw new IllegalStateException("unsupported matching state version " + version);
+        }
+        final int bookCount = buffer.getInt(pos + 4, STATE_ORDER);
+        pos += 8;
+        final int[] seen = new int[bookCount];
+        for (int b = 0; b < bookCount; b++)
+        {
+            final int instrumentId = buffer.getInt(pos, STATE_ORDER);
+            final OrderBook book = books.get(instrumentId);
+            if (book == null)
+            {
+                throw new IllegalStateException("snapshot contains unknown instrument " + instrumentId);
+            }
+            if (book.orderCount() != 0)
+            {
+                throw new IllegalStateException("cannot restore into a non-empty book " + instrumentId);
+            }
+            seen[b] = instrumentId;
+            book.restoreSequences(buffer.getLong(pos + 4, STATE_ORDER), buffer.getLong(pos + 12, STATE_ORDER));
+            final int orderCount = buffer.getInt(pos + 20, STATE_ORDER);
+            pos += 24;
+            for (int i = 0; i < orderCount; i++)
+            {
+                final Order o = orderPool.acquire();
+                o.orderId = buffer.getLong(pos, STATE_ORDER);
+                o.clientOrderId = buffer.getLong(pos + 8, STATE_ORDER);
+                o.userId = buffer.getLong(pos + 16, STATE_ORDER);
+                o.price = buffer.getLong(pos + 24, STATE_ORDER);
+                o.quantity = buffer.getLong(pos + 32, STATE_ORDER);
+                o.filledQuantity = buffer.getLong(pos + 40, STATE_ORDER);
+                o.timestamp = buffer.getLong(pos + 48, STATE_ORDER);
+                o.side = Side.get(buffer.getByte(pos + 56));
+                o.orderType = OrderType.get(buffer.getByte(pos + 57));
+                o.timeInForce = TimeInForce.get(buffer.getByte(pos + 58));
+                o.selfTradePrevention = SelfTradePrevention.get(buffer.getByte(pos + 59));
+                o.instrumentId = instrumentId;
+                book.addResting(o, levelPool);
+                pos += ORDER_STATE_LENGTH;
+            }
+            book.clearChanges();
+        }
+        Arrays.sort(seen);
+        if (!Arrays.equals(seen, instrumentIds))
+        {
+            throw new IllegalStateException("snapshot instruments " + Arrays.toString(seen) +
+                " do not match engine instruments " + Arrays.toString(instrumentIds));
+        }
+        return pos - offset;
     }
 
     /**

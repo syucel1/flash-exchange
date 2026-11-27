@@ -66,7 +66,10 @@ public enum Reason
     NOT_ORDER_OWNER((byte)18),
 
     /** Post-only flag on a market order. */
-    POST_ONLY_NOT_ALLOWED((byte)19);
+    POST_ONLY_NOT_ALLOWED((byte)19),
+
+    /** The user already submitted an order with this client order id (within the deduplication window). */
+    DUPLICATE_CLIENT_ORDER_ID((byte)20);
 
     private static final Reason[] LOOKUP = new Reason[256];
 

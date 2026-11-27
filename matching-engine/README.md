@@ -5,8 +5,10 @@ processed by an LMAX Disruptor pipeline, and executions plus live order-book mar
 Aeron runs over **shared memory (IPC)** when components share a box, and over **reliable UDP** when they don't.
 You choose between them in configuration.
 
-Scope of this stage: the matching engine and its Aeron integration only. Balances, settlement, portfolio,
-journaling/replication and the trading service are out of scope (see `docs/`).
+Scope so far: the matching engine, its Aeron integration, and (roadmap phase 2) durability and high availability:
+a command journal and state snapshots on Aeron Archive, cold recovery, and a primary/standby pair supervised by an
+arbiter (details in [docs/10-durability-ha.md](../docs/10-durability-ha.md)). Balances, settlement and the trading
+service come later (see `docs/` and the roadmap).
 
 ## Architecture
 
@@ -24,18 +26,23 @@ journaling/replication and the trading service are out of scope (see `docs/`).
 | `com.flashexchange.protocol` (module `protocol`) | Zero-allocation, little-endian, SBE-style flyweights for every message, enums with wire codes, `EngineMessageDispatcher` for decoding engine output |
 | `engine.matching` | `MatchingEngine`, `OrderBook`, `BookSide` (sorted level array, best at end, plus price→level hash index), `PriceLevel` (intrusive FIFO), pooled `Order`s |
 | `engine.pipeline` | Disruptor wiring (`EnginePipeline`), ring slot (`OrderCommand`), matcher and publisher stages, `EncodingEventSink`, back-pressure-aware `OfferingMessagePublisher` |
-| `engine.transport` | `AeronTransport` (optional embedded media driver, subscription, exclusive publications) and `CommandIngress` |
+| `engine.transport` | `AeronTransport` (optional embedded media driver, subscription, exclusive publications) and `CommandIngress` (decodes commands into the ring, stamps sequence, timestamp, epoch and duplicate flag) |
+| `engine.node` | `EngineConductor` (single ring producer and role state machine: STANDALONE / PENDING / PRIMARY / STANDBY / FENCED), `EngineCore` (sequencer + pipeline + ingress, restore and journal replay), `EpochFile` |
+| `engine.durability` | `EngineArchive` (embedded Aeron Archive, journal open/extend, remote archive client), `JournalStage` (Disruptor stage writing stream 100), `DurabilityController` (release gate), `SnapshotStore` (stream 110 snapshots with CRC) |
+| `engine.ha` | `Sequencer` and `DedupWindow` (duplicate `clOrdId`), `ReplicationLink` (acks on 102, SYNC/ASYNC, lease, fencing), `Arbiter`, `ArbiterServer`, `ArbiterMain` |
 | `engine.config` | `EngineConfig` (builder and properties), `EngineChannels` (IPC / UDP channel presets for the engine and client sides) |
-| `engine.client` | `EngineClient`: client side of the Aeron interface, used by the integration tests and later by the trading service |
+| `engine.client` | `EngineClient`: client side of the Aeron interface (one engine or an HA pair), `OutputDeduplicator` (drops output re-published after recovery/failover); used by the tests, the demo trader and later the trading service |
 | `engine` | `MatchingEngineServer` (composition root), `MatchingEngineMain` (process entry point) |
 
 ### Threads
 
 | Thread | Work |
 |---|---|
-| `engine-ingress` | Polls stream 1001, decodes, claims a ring slot, assigns `engineSequence`, `orderId = sequence + 1` and the timestamp |
+| `engine-conductor` | Polls stream 1001 (or, as standby, the primary's journal on 101), claims a ring slot, assigns `engineSequence`, `orderId = sequence + 1`, timestamp and duplicate flag; HA heartbeats, arbiter commands, acks, snapshot timer |
 | `engine-pipeline-0..N-1` | Matcher shards: a shard owns the instruments where `instrumentId mod N == shard`, so each book has exactly one writer and no locks |
-| `engine-pipeline-N` | Publisher: sends each slot's encoded output in engine-sequence order to streams 2001 and 3001 |
+| `engine-pipeline-N` | Journal stage (when enabled): writes each command to the journal (stream 100) in parallel with matching |
+| `engine-pipeline-N+1` | Publisher and release gate: waits until the journal entry is recorded (and, SYNC HA, acked by the standby), then sends the output in engine-sequence order to streams 2001 and 3001; writes state snapshots; retains output as standby |
+| archive | Embedded Aeron Archive (SHARED threading) recording the journal and snapshots |
 | media driver | Embedded driver (SHARED: 1 thread; DEDICATED: 3 threads) or an external driver process |
 
 ## Matching rules
@@ -62,6 +69,11 @@ All messages start with an 8-byte header (`blockLength`, `templateId`, `schemaId
 | 3001 out | 201 | `BookUpdate`: incremental L2 with per-instrument `bookSequence`; quantity 0 means the level was removed |
 | 3001 out | 202 | `BookSnapshot`: full or depth-limited L2, best first; carries the `bookSequence` it reflects. Sent on request and every `snapshot.intervalMs` |
 | 3001 out | 203 | `PublicTrade` |
+| 2001 + 3001 out | 130 | `EngineRole`: role and epoch, published on start (with a journal), promotion and recovery; consumers use it to drop re-published output |
+| 100 journal | 50 | `JournalEntry` (recorded by the archive; replicated to the standby on 101) |
+| 110 snapshot | 60 / 61 / 62 | `SnapshotBegin`, `SnapshotChunk`, `SnapshotEnd` (CRC32) |
+| 102 | 51 | `ReplicationAck` (standby → primary) |
+| 9001 / 9002 | 52 / 53 | `NodeHeartbeat` (node → arbiter), `ArbiterCommand` PROMOTE / FOLLOW / LEASE / FENCE |
 
 How a consumer keeps a live book: apply a snapshot, then apply updates whose `bookSequence` is exactly `last + 1`. On a gap, request a new snapshot.
 
@@ -103,8 +115,12 @@ Running from an IDE or `java -cp`: add `--add-exports java.base/jdk.internal.mis
 | protocol `*Test` | Codec round trips, field overlap guard, header validation, dispatcher |
 | pipeline / config / ingress `*Test` | Disruptor pipeline (all wait strategies, sharding, ordering, failure isolation, shutdown), encoder, back-pressure policy, configuration parsing, command decoding, periodic snapshots |
 | `MatchingEngineServerIT` | End to end over real media drivers: IPC; **UDP between independent media drivers with two subscribing gateways**; periodic snapshots; 6,000 orders across 3 shards; malformed input; no-subscriber drops; external driver; launch failure cleanup; `main` |
+| `DurabilityIT` | Crash recovery to byte-identical state, snapshot + journal tail, shutdown snapshot, duplicate `clOrdId` across restarts, corrupt snapshots skipped, client de-duplication |
+| `HighAvailabilityIT` | Primary killed under load → standby promoted in < 1 s with no lost or duplicated fills, double failover, ASYNC, SYNC degrade, lease expiry, planned switchover with fencing, 10 % packet loss on the standby |
+| `ArbiterTest`, `ReplicationLinkTest`, `SequencerTest`, `DedupWindowTest`, `OutputDeduplicatorTest`, `MatchingEngineStateTest` | HA building blocks |
 
-Coverage at the time of writing: **99.9% lines, 98.9% branches**. The build fails below 95% lines or 90% branches.
+Coverage at the time of writing: **96% lines, 85% branches** for the engine module (protocol: 99%). The build
+fails below 95% lines or 85% branches.
 
 ### Indicative performance
 
@@ -121,7 +137,19 @@ p50 ≈ 0.4 µs, p99 ≈ 1.3 µs per command, measured in-process without Aeron.
   cancels over IPC or UDP and prints a trading summary. It powers the docker-compose stack and the smoke test (see
   `docker/config/demo-*.properties`).
 
-## Next steps (not in this stage)
+## Durability and HA in one minute
 
-Command journal (Aeron Archive) and primary/standby replication, risk and balance holds, the trading service,
-cancel/replace, GTD orders, and thread affinity.
+```bash
+# standalone engine with a journal: restart it and it recovers its books
+java -Dflash.engine.journal.enabled=true -Dflash.engine.data.dir=/tmp/flash -jar matching-engine-*-all.jar config/engine-ipc.properties
+# HA pair + arbiter in containers, then a kill -9 failover drill
+docker compose --profile ha up -d && bash scripts/ha-failover-smoke-test.sh
+```
+
+`/status` shows `role`, `epoch`, `lastSequence`, `journalPosition` / `journalRecordedPosition`, `snapshotsWritten`,
+and for HA `leaseValid`, `standbyAttached`, `degraded`, `ackedSequence`, `followPosition`, `peerVisible`.
+
+## Next steps
+
+Metrics (phase 3), risk and balance holds (phase 6), the trading service, cancel/replace, GTD orders, thread
+affinity.

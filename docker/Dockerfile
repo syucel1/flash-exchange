@@ -23,7 +23,8 @@ LABEL org.opencontainers.image.title="flash-exchange" \
 
 RUN groupadd --system --gid 10001 flashex \
  && useradd --system --uid 10001 --gid flashex --home-dir /opt/flashex --no-create-home --shell /usr/sbin/nologin flashex \
- && mkdir -p /opt/flashex/lib /opt/flashex/config /opt/flashex/bin
+ && mkdir -p /opt/flashex/lib /opt/flashex/config /opt/flashex/bin /var/lib/flashex \
+ && chown flashex:flashex /var/lib/flashex
 
 WORKDIR /opt/flashex
 # application files stay root-owned and read-only for the runtime user
@@ -36,8 +37,13 @@ ENV JDK_JAVA_OPTIONS="--add-exports java.base/jdk.internal.misc=ALL-UNNAMED --ad
     JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -Xms256m -Xmx256m" \
     FLASHEX_HOME=/opt/flashex
 
-# 8080: engine HTTP (/health, /status); 40101-40301/udp: engine Aeron endpoints in UDP mode
-EXPOSE 8080 40101/udp 40201/udp 40301/udp
+# 8080: engine/arbiter HTTP (/health, /status); 40101-40301/udp: engine Aeron endpoints in UDP mode;
+# 8010/udp: archive control (standby bootstrap); 40111-40113/udp: replication, acks, arbiter commands;
+# 40901/udp: arbiter heartbeats
+EXPOSE 8080 8010/udp 40101/udp 40111/udp 40112/udp 40113/udp 40201/udp 40301/udp 40901/udp
+
+# journal, snapshots, node epoch and arbiter state
+VOLUME ["/var/lib/flashex"]
 
 USER 10001:10001
 ENTRYPOINT ["/opt/flashex/bin/entrypoint.sh"]

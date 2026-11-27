@@ -1,18 +1,19 @@
 package com.flashexchange.engine;
 
 import com.flashexchange.engine.config.EngineConfig;
+import com.flashexchange.engine.durability.EngineArchive;
 import com.flashexchange.engine.matching.Instrument;
+import com.flashexchange.engine.node.EngineConductor;
+import com.flashexchange.engine.node.EngineCore;
 import com.flashexchange.engine.ops.EngineHttpServer;
 import com.flashexchange.engine.pipeline.EnginePipeline;
 import com.flashexchange.engine.pipeline.OfferingMessagePublisher;
-import com.flashexchange.engine.pipeline.OrderCommand;
 import com.flashexchange.engine.transport.AeronTransport;
 import com.flashexchange.engine.transport.CommandIngress;
-import com.lmax.disruptor.RingBuffer;
+import com.flashexchange.protocol.NodeRole;
 import org.agrona.CloseHelper;
 import org.agrona.concurrent.AgentRunner;
 import org.agrona.concurrent.BackoffIdleStrategy;
-import org.agrona.concurrent.SystemEpochNanoClock;
 import org.agrona.concurrent.SystemNanoClock;
 
 import java.util.LinkedHashMap;
@@ -24,10 +25,13 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Composition root of the matching engine process:
  * <pre>
- *   Aeron 1001 ──▶ CommandIngress ──▶ Disruptor ring ──▶ matcher shard(s) ──▶ publisher ──▶ Aeron 2001 / 3001
+ *   Aeron 1001 ──▶ conductor ──▶ Disruptor ring ──▶ matcher shard(s) ‖ journal (Archive 100) ──▶ release gate
+ *                                                                                              ──▶ Aeron 2001 / 3001
  * </pre>
- * {@link #launch(EngineConfig)} wires and starts everything; {@link #close()} stops the ingress, drains the
- * pipeline, then closes Aeron (and the embedded driver).
+ * {@link #launch(EngineConfig)} wires and starts everything. Without HA the engine recovers from its local snapshot
+ * and journal (when enabled) before {@code launch} returns; with HA it waits for the arbiter to make it primary or
+ * standby. {@link #close()} stops the conductor, writes a final snapshot, drains the pipeline, then closes the
+ * archive and Aeron.
  */
 public final class MatchingEngineServer implements AutoCloseable
 {
@@ -35,20 +39,22 @@ public final class MatchingEngineServer implements AutoCloseable
 
     private final EngineConfig config;
     private final AeronTransport transport;
+    private final EngineArchive archive;
     private final OfferingMessagePublisher executionPublisher;
     private final OfferingMessagePublisher marketDataPublisher;
-    private final EnginePipeline pipeline;
-    private final CommandIngress ingress;
-    private final AgentRunner ingressRunner;
+    private final EngineConductor conductor;
+    private final AgentRunner conductorRunner;
     private final AtomicLong ingressErrors = new AtomicLong();
     private final EngineHttpServer httpServer;
     private final long startTimeMs = System.currentTimeMillis();
+    private volatile Runnable fencedListener = () -> { };
     private volatile boolean closed;
 
-    private MatchingEngineServer(final EngineConfig config, final AeronTransport transport)
+    private MatchingEngineServer(final EngineConfig config, final AeronTransport transport, final EngineArchive archive)
     {
         this.config = config;
         this.transport = transport;
+        this.archive = archive;
 
         final long retryTimeoutNs = TimeUnit.MILLISECONDS.toNanos(config.publishRetryTimeoutMs());
         this.executionPublisher = new OfferingMessagePublisher(
@@ -58,28 +64,15 @@ public final class MatchingEngineServer implements AutoCloseable
             "marketData", transport.marketDataPublication()::offer, new BackoffIdleStrategy(),
             SystemNanoClock.INSTANCE, retryTimeoutNs);
 
-        this.pipeline = new EnginePipeline(
-            config.instruments(),
-            config.matcherShards(),
-            config.ringBufferSize(),
-            config.waitStrategy().create(),
-            config.orderPoolSize(),
-            config.snapshotDepth(),
-            executionPublisher,
-            marketDataPublisher,
-            config.shutdownTimeoutMs());
-        final RingBuffer<OrderCommand> ringBuffer = pipeline.start();
-
-        this.ingress = new CommandIngress(
-            transport.commandSubscription(),
-            ringBuffer,
-            new SystemEpochNanoClock(),
-            config.fragmentLimit(),
-            config.instruments().stream().mapToInt(Instrument::id).toArray(),
-            TimeUnit.MILLISECONDS.toNanos(config.snapshotIntervalMs()));
-        this.ingressRunner = new AgentRunner(
-            config.ingressIdleStrategy().create(), this::onIngressError, null, ingress);
-        AgentRunner.startOnThread(ingressRunner);
+        this.conductor = new EngineConductor(config, transport.aeron(), transport.commandSubscription(),
+            executionPublisher, marketDataPublisher, archive, this::onFenced);
+        if (!config.ha().enabled())
+        {
+            conductor.startStandalone();
+        }
+        this.conductorRunner = new AgentRunner(
+            config.ingressIdleStrategy().create(), this::onIngressError, null, conductor);
+        AgentRunner.startOnThread(conductorRunner);
 
         EngineHttpServer http = null;
         try
@@ -91,20 +84,43 @@ public final class MatchingEngineServer implements AutoCloseable
         }
         catch (final RuntimeException ex)
         {
-            CloseHelper.quietCloseAll(ingressRunner, pipeline);
+            CloseHelper.quietClose(conductorRunner);
+            final EngineCore core = conductor.core();
+            CloseHelper.quietClose(core);
             throw ex;
         }
         this.httpServer = http;
     }
 
+    private void onFenced()
+    {
+        fencedListener.run();
+    }
+
     /**
-     * Liveness: not closed, ingress agent running and Aeron client open.
+     * Register a callback run (on the conductor thread) when the arbiter fences this node. The process must then
+     * exit and restart to rejoin as a standby.
+     *
+     * @param listener callback.
+     */
+    public void onFenced(final Runnable listener)
+    {
+        this.fencedListener = listener;
+        if (conductor.isFenced())
+        {
+            listener.run();
+        }
+    }
+
+    /**
+     * Liveness: not closed or fenced, conductor running and Aeron client open. A pending HA node (waiting for
+     * the arbiter) is healthy.
      *
      * @return true when the engine can process commands.
      */
     public boolean isHealthy()
     {
-        return !closed && !ingressRunner.isClosed() && !transport.aeron().isClosed();
+        return !closed && !conductor.isFenced() && !conductorRunner.isClosed() && !transport.aeron().isClosed();
     }
 
     /**
@@ -125,11 +141,19 @@ public final class MatchingEngineServer implements AutoCloseable
         status.put("marketDataChannel", config.channels().marketDataChannel());
         status.put("matcherShards", config.matcherShards());
         status.put("instruments", config.instruments().stream().map(Instrument::symbol).toList());
-        status.put("commandsReceived", ingress.commandsReceived());
-        status.put("malformedMessages", ingress.malformedMessages());
-        status.put("snapshotsScheduled", ingress.snapshotsScheduled());
-        status.put("lastPublishedSequence", pipeline.lastPublishedSequence());
-        status.put("eventExceptions", pipeline.eventExceptions());
+        status.put("journalEnabled", config.durability().journalEnabled());
+        status.put("haEnabled", config.ha().enabled());
+        status.put("nodeId", config.ha().nodeId());
+        status.putAll(conductor.status());
+        final EngineCore core = conductor.core();
+        if (core != null)
+        {
+            status.put("commandsReceived", core.ingress().commandsReceived());
+            status.put("malformedMessages", core.ingress().malformedMessages());
+            status.put("snapshotsScheduled", core.ingress().snapshotsScheduled());
+            status.put("lastPublishedSequence", core.pipeline().lastPublishedSequence());
+            status.put("eventExceptions", core.pipeline().eventExceptions());
+        }
         status.put("ingressErrors", ingressErrors.get());
         status.put("publishers", List.of(publisherStatus(executionPublisher), publisherStatus(marketDataPublisher)));
         return status;
@@ -176,15 +200,21 @@ public final class MatchingEngineServer implements AutoCloseable
     public static MatchingEngineServer launch(final EngineConfig config)
     {
         final AeronTransport transport = AeronTransport.connect(config);
+        EngineArchive archive = null;
         try
         {
-            final MatchingEngineServer server = new MatchingEngineServer(config, transport);
+            if (config.durability().journalEnabled())
+            {
+                archive = EngineArchive.launch(config.durability(), config.ha().nodeId(),
+                    transport.aeron().context().aeronDirectoryName(), transport.aeron());
+            }
+            final MatchingEngineServer server = new MatchingEngineServer(config, transport, archive);
             LOGGER.log(System.Logger.Level.INFO, "matching engine started: " + config);
             return server;
         }
         catch (final RuntimeException ex)
         {
-            transport.close();
+            CloseHelper.quietCloseAll(archive, transport);
             throw ex;
         }
     }
@@ -232,17 +262,49 @@ public final class MatchingEngineServer implements AutoCloseable
      */
     public CommandIngress ingress()
     {
-        return ingress;
+        final EngineCore core = conductor.core();
+        return core == null ? null : core.ingress();
     }
 
     /**
      * Processing pipeline.
      *
-     * @return pipeline.
+     * @return pipeline, or {@code null} while an HA node waits for its role.
      */
     public EnginePipeline pipeline()
     {
-        return pipeline;
+        final EngineCore core = conductor.core();
+        return core == null ? null : core.pipeline();
+    }
+
+    /**
+     * Node conductor (role, epoch, replication state).
+     *
+     * @return conductor.
+     */
+    public EngineConductor conductor()
+    {
+        return conductor;
+    }
+
+    /**
+     * Current node role.
+     *
+     * @return role.
+     */
+    public NodeRole role()
+    {
+        return conductor.role();
+    }
+
+    /**
+     * Local archive, or {@code null} when the journal is disabled.
+     *
+     * @return archive.
+     */
+    public EngineArchive archive()
+    {
+        return archive;
     }
 
     /**
@@ -266,7 +328,7 @@ public final class MatchingEngineServer implements AutoCloseable
     }
 
     /**
-     * Errors raised by the ingress agent.
+     * Errors raised by the conductor agent.
      *
      * @return count.
      */
@@ -286,8 +348,38 @@ public final class MatchingEngineServer implements AutoCloseable
             return;
         }
         closed = true;
-        CloseHelper.closeAll(httpServer, ingressRunner, pipeline, transport);
+        CloseHelper.closeAll(httpServer, conductorRunner);
+        try
+        {
+            conductor.onShutdown();
+        }
+        catch (final RuntimeException ex)
+        {
+            LOGGER.log(System.Logger.Level.WARNING, "final snapshot not scheduled", ex);
+        }
+        CloseHelper.closeAll(conductor.core(), archive, transport);
         LOGGER.log(System.Logger.Level.INFO, "matching engine stopped: " + executionPublisher + " " +
             marketDataPublisher);
+    }
+
+    /**
+     * Stop abruptly, as if the process had been killed: no final snapshot, in-flight commands are abandoned and
+     * the archive is closed with whatever it has recorded. Used by failover and recovery tests.
+     */
+    public void halt()
+    {
+        if (closed)
+        {
+            return;
+        }
+        closed = true;
+        CloseHelper.quietCloseAll(httpServer, conductorRunner);
+        final EngineCore core = conductor.core();
+        if (core != null)
+        {
+            core.halt();
+        }
+        CloseHelper.quietCloseAll(archive, transport);
+        LOGGER.log(System.Logger.Level.INFO, "matching engine halted");
     }
 }

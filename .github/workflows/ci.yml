@@ -126,6 +126,12 @@ jobs:
           FLASHEX_IMAGE: flash-exchange:ci
         run: bash scripts/compose-smoke-test.sh --udp
 
+      - name: HA failover drill (kill -9 the primary, promotion < 1 s, rejoin as standby)
+        env:
+          FLASHEX_IMAGE: flash-exchange:ci
+          MAX_FAILOVER_MS: "1000"
+        run: bash scripts/ha-failover-smoke-test.sh
+
       - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3

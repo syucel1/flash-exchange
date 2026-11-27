@@ -73,6 +73,18 @@ class DemoTraderConfigTest
     }
 
     @Test
+    void haPairOfEngineHosts()
+    {
+        final Properties p = new Properties();
+        p.setProperty("flash.demo.transport", "udp");
+        p.setProperty("flash.demo.udp.engineHost", "engine-a, engine-b,");
+        final DemoTraderConfig c = DemoTraderConfig.fromProperties(p);
+        assertEquals(2, c.engines().size());
+        assertEquals("aeron:udp?endpoint=engine-b:40101", c.engines().get(1).commandChannel());
+        assertEquals(c.engines().get(0), c.channels());
+    }
+
+    @Test
     void validation()
     {
         assertThrows(IllegalArgumentException.class, () -> DemoTraderConfig.parseInstruments("1,A,1,1"));
