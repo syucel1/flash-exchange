@@ -41,7 +41,7 @@
         <checkstyle.version>10.20.2</checkstyle.version>
         <spotbugs.plugin.version>4.8.6.6</spotbugs.plugin.version>
         <spotbugs.version>4.8.6</spotbugs.version>
-        <dependency-check.plugin.version>11.1.1</dependency-check.plugin.version>
+        <dependency-check.plugin.version>13.0.0</dependency-check.plugin.version>
         <versions.plugin.version>2.18.0</versions.plugin.version>
 
         <!-- stamped into jar manifests; CI passes -Dbuild.revision=$GITHUB_SHA -->
